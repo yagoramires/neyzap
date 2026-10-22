@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 import Carbon
 import ServiceManagement
 
@@ -7,18 +8,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private var statusItem: NSStatusItem?
     private var hotKey: HotKey?
     private var debugBridge: DebugBridge?
-    private let accountsMenu = NSMenu(title: "Contas")
+    private let accountsMenu = NSMenu(title: "Guias")
     private let statusMenu = NSMenu()
 
     private var window: NSWindow { windowController.window! }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Uma instância só: duas cópias mexendo nos mesmos dados podem corromper sessões.
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "local.neyzap")
+            .filter { $0 != NSRunningApplication.current }
+        if let running = others.first {
+            running.activate()
+            exit(0)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = WebCryptoKey.data
         Notifier.shared.setup()
+        if UserDefaults.standard.bool(forKey: "systemNotifications") { Notifier.shared.requestPermission() }
         let openNotification: (UUID, String) -> Void = { [weak self] accountID, jsID in
             guard let self else { return }
-            self.showWindow()
+            // Escolhe a guia antes de mostrar a janela: senão a anterior aparece por um
+            // instante e as mensagens dela são marcadas como lidas.
             self.windowController.select(accountID: accountID)
+            self.showWindow()
             self.windowController.sessions.first { $0.accountID == accountID }?.notificationClicked(jsID)
         }
         Notifier.shared.onClick = openNotification
@@ -42,9 +56,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
         debugBridge = DebugBridge(windowController: windowController)
         showWindow()
-        Log.write("NeyZap \(UpdateChecker.currentVersion) aberto, \(windowController.sessions.count) conta(s)")
-        // Verificação silenciosa: só aparece algo se houver versão nova.
+        Log.write("NeyZap \(UpdateChecker.currentVersion) aberto, \(windowController.sessions.count) guia(s)")
+        removeOrphanedData()
+        // Verificação silenciosa (só aparece algo se houver versão nova): ao abrir e uma vez por dia.
         DispatchQueue.main.asyncAfter(deadline: .now() + 8) { UpdateChecker.check(userInitiated: false) }
+        let daily = Timer(timeInterval: 24 * 3600, repeats: true) { _ in UpdateChecker.check(userInitiated: false) }
+        daily.tolerance = 3600
+        RunLoop.main.add(daily, forMode: .common)
+    }
+
+    /// Dados de guias que já foram fechadas (a remoção pode ter falhado ou o app foi
+    /// encerrado antes): apaga, para nenhuma sessão ficar logada no disco sem guia.
+    private func removeOrphanedData() {
+        let known = Set(AccountStore.shared.accounts.map(\.id))
+        WKWebsiteDataStore.fetchAllDataStoreIdentifiers { ids in
+            for id in ids where !known.contains(id) {
+                WKWebsiteDataStore.remove(forIdentifier: id) { error in
+                    Log.write(error == nil ? "dados de guia fechada removidos" : "não consegui remover dados de guia fechada: \(error!.localizedDescription)")
+                }
+            }
+        }
     }
 
     /// Menu do ícone no Dock: contas (com não lidas), conectar número, atualizações e logs.
@@ -58,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             if !counts.isEmpty { title += " (\(counts.joined(separator: " · ")))" }
             let entry = item(title, #selector(selectAccount(_:)), "")
             entry.tag = i
-            entry.state = i == windowController.selectedIndex ? .on : .off
+            entry.state = session === windowController.activeSession ? .on : .off
             menu.addItem(entry)
         }
         menu.addItem(.separator())
@@ -162,7 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         main.addItem(submenu(edit, "Editar"))
 
         accountsMenu.delegate = self
-        main.addItem(submenu(accountsMenu, "Contas"))
+        main.addItem(submenu(accountsMenu, "Guias"))
 
         let view = NSMenu(title: "Visualizar")
         view.addItem(item("Voltar para as conversas", #selector(goBack), "["))
@@ -202,7 +233,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let sessions = windowController.sessions
 
         if menu === statusMenu {
-            menu.addItem(item(window.isVisible ? "Esconder NeyZap" : "Mostrar NeyZap", #selector(toggleWindow), ""))
+            let visible = window.isVisible && !NSApp.isHidden
+            menu.addItem(item(visible ? "Esconder NeyZap" : "Mostrar NeyZap", visible ? #selector(hideApp) : #selector(showWindowAction), ""))
             menu.addItem(.separator())
         }
 
@@ -210,7 +242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             let title = session.unread > 0 ? "\(session.name) (\(session.unread))" : session.name
             let entry = item(title, #selector(selectAccount(_:)), menu === accountsMenu && i < 9 ? "\(i + 1)" : "")
             entry.tag = i
-            entry.state = i == windowController.selectedIndex ? .on : .off
+            entry.state = session === windowController.activeSession ? .on : .off
             menu.addItem(entry)
         }
 
@@ -243,12 +275,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     // MARK: - Ações
 
     @objc private func selectAccount(_ sender: NSMenuItem) {
-        showWindow()
         windowController.select(index: sender.tag)
+        showWindow()
         refreshAccountsMenu()
     }
 
-    @objc private func addAccount() { windowController.newTab() }
+    @objc private func showWindowAction() { showWindow() }
+    @objc private func hideApp() { NSApp.hide(nil) }
+
+    @objc private func addAccount() {
+        windowController.newTab()
+        showWindow()
+    }
     @objc private func renameAccount() { windowController.promptRename(accountID: windowController.activeSession.accountID) }
     @objc private func removeAccount() { windowController.confirmClose(accountID: windowController.activeSession.accountID) }
     @objc private func resetSession() { windowController.confirmReset(accountID: windowController.activeSession.accountID) }
@@ -276,7 +314,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     /// Desligado: balões do próprio NeyZap (com a foto). Ligado: Central de Notificações.
     @objc private func toggleSystemNotifications() {
         let defaults = UserDefaults.standard
-        defaults.set(!defaults.bool(forKey: "systemNotifications"), forKey: "systemNotifications")
+        let on = !defaults.bool(forKey: "systemNotifications")
+        defaults.set(on, forKey: "systemNotifications")
+        if on { Notifier.shared.requestPermission() }
     }
 
     @objc private func toggleLaunchAtLogin() {

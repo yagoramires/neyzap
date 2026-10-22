@@ -17,6 +17,7 @@ enum UpdateChecker {
             let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             let tag = (json?["tag_name"] as? String) ?? ""
             let page = (json?["html_url"] as? String).flatMap(URL.init(string:))
+                .flatMap { $0.scheme == "https" && $0.host == "github.com" ? $0 : nil }
             DispatchQueue.main.async {
                 guard error == nil, status == 200, !tag.isEmpty, let page else {
                     Log.write("atualização: falha ao consultar (status \(status), \(error?.localizedDescription ?? "sem release"))")

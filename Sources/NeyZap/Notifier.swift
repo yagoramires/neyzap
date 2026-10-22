@@ -11,11 +11,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     func setup() {
         center.delegate = self
+    }
+
+    /// Pede permissão à Central de Notificações (só no modo "notificações do sistema").
+    func requestPermission() {
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            UNUserNotificationCenter.current().getNotificationSettings { settings in
-                let status = "granted=\(granted) auth=\(settings.authorizationStatus.rawValue) alert=\(settings.alertSetting.rawValue) error=\(String(describing: error))\n"
-                try? status.write(to: AppPaths.debug.appendingPathComponent("notifications.txt"), atomically: true, encoding: .utf8)
-            }
+            if let error { Log.write("notificações do sistema não autorizadas: \(error.localizedDescription)") }
         }
     }
 

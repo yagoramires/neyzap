@@ -6,6 +6,7 @@
   if (window.__neyzap) return;
 
   const cfg = window.__neyzapConfig || {};
+  try { delete window.__neyzapConfig; } catch (_) {} // não deixa a configuração exposta à página
   const root = document.documentElement;
   const post = (msg) => {
     try { window.webkit.messageHandlers.neyzap.postMessage(msg); } catch (_) {}
@@ -16,6 +17,8 @@
   // ---------------------------------------------------------------------------
   const live = new Map();
   let seq = 0;
+  // Ids únicos por carga da página: um clique numa notificação antiga não abre outra conversa.
+  const loadId = Math.random().toString(36).slice(2, 8);
 
   function iconToDataURL(url) {
     if (url.startsWith('data:')) return Promise.resolve(url);
@@ -30,7 +33,7 @@
   class NeyZapNotification extends EventTarget {
     constructor(title, options = {}) {
       super();
-      this.id = String(++seq);
+      this.id = `${loadId}-${++seq}`;
       this.title = String(title ?? '');
       this.body = options.body ? String(options.body) : '';
       this.tag = options.tag ? String(options.tag) : '';
@@ -39,6 +42,7 @@
       this.silent = !!options.silent;
       this.onclick = this.onclose = this.onshow = this.onerror = null;
       live.set(this.id, this);
+      if (live.size > 200) live.delete(live.keys().next().value); // as mais antigas saem
       const send = (icon) => post({ type: 'notify', id: this.id, title: this.title, body: this.body, tag: this.tag, silent: this.silent, icon });
       // A foto do contato costuma vir como blob:, que só esta página consegue ler:
       // vira data URL antes de ir para o app. URLs https o app baixa sozinho.
@@ -171,6 +175,7 @@
   }
 
   function applyCompact() {
+    overlayCache = new WeakMap(); // a posição das camadas muda com a largura
     if (compactQuery.matches) root.dataset.nzCompact = '';
     else delete root.dataset.nzCompact;
     // O painel de emojis foi desenhado para 560 px; abaixo disso ele encolhe inteiro.
@@ -239,7 +244,7 @@
       if (c.getAttribute('data-nz') !== role) c.setAttribute('data-nz', role);
       // Camada dos painéis da esquerda (Configurações, Nova conversa, Perfil…):
       // a 1ª coluna imita a largura da lista; a 2ª é o resto da tela.
-      if (role === 'overlay' && c.children.length >= 2 && getComputedStyle(c).flexDirection === 'row') {
+      if (role === 'overlay' && isPanelsLayer(c)) {
         [...c.children].forEach((k, j) => {
           const sub = j === 0 ? 'side' : 'rest';
           if (k.getAttribute('data-nz-sub') !== sub) k.setAttribute('data-nz-sub', sub);
@@ -249,7 +254,7 @@
 
     // Painel da direita (dados do contato, busca na conversa…) aberto? Fechado,
     // ele só tem um <span> vazio.
-    const drawerOpen = kids.some((c) => c.getAttribute('data-nz') === 'drawer' && c.children.length
+    const drawerOpen = kids.some((c) => c.getAttribute('data-testid') === 'drawer-right' && c.children.length
       && !(c.children.length === 1 && c.firstElementChild.tagName === 'SPAN' && !c.firstElementChild.firstChild));
     if (drawerOpen) root.dataset.nzDrawer = '';
     else delete root.dataset.nzDrawer;
@@ -272,7 +277,22 @@
 
   // Decide uma vez por elemento, sem os nossos atributos: o próprio CSS do modo
   // compacto põe colunas em position:fixed, o que não pode virar "camada".
-  const overlayCache = new WeakMap();
+  let overlayCache = new WeakMap();
+  // Camada dos painéis da esquerda (Configurações, Nova conversa, prévia de mídia):
+  // flex em linha, com a 1ª coluna alinhada à lista. Identificada uma vez e guardada,
+  // porque o próprio CSS do modo compacto mexe na geometria dela depois.
+  const panelsLayers = new WeakSet();
+  function isPanelsLayer(el) {
+    if (panelsLayers.has(el)) return true;
+    if (el.children.length < 2 || getComputedStyle(el).flexDirection !== 'row' || !sidePane) return false;
+    if ('nzCompact' in root.dataset && root.dataset.nzView === 'chat') return false;
+    const first = el.children[0].getBoundingClientRect();
+    const side = sidePane.getBoundingClientRect();
+    if (Math.abs(first.left - side.left) > 4) return false;
+    panelsLayers.add(el);
+    return true;
+  }
+
   function isOverlay(el) {
     if (!overlayCache.has(el)) {
       const tag = el.getAttribute('data-nz');
@@ -389,47 +409,67 @@
   const railButton = (labels) => [...document.querySelectorAll('header button[aria-label], [data-nz="left"] button')]
     .find((b) => labels.includes(b.getAttribute('aria-label')));
   // Painéis da esquerda (configurações), fora da lista de conversas e da conversa.
-  const panelNodes = () => [...document.querySelectorAll('#app *')]
-    .filter((e) => !e.closest('#pane-side, #main'));
   const clickable = (el) => {
     for (let c = el, i = 0; c && i < 8; c = c.parentElement, i++) {
       if (c.tagName === 'BUTTON' || c.getAttribute('role') === 'button' || c.getAttribute('tabindex') === '0') return c;
     }
     return el;
   };
+  // Texto visível nos painéis da esquerda (configurações), sem entrar na lista de
+  // conversas, na conversa nem no painel da direita (onde nomes de contatos e
+  // mensagens poderiam coincidir).
+  const PANEL_SKIP = '#pane-side, #main, [data-testid="drawer-right"]';
+  function findPanelText(re) {
+    const start = document.getElementById('app') || document.body;
+    const walker = document.createTreeWalker(start, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => n.nodeType === Node.ELEMENT_NODE
+        ? (n.matches(PANEL_SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP)
+        : (re.test(n.data.trim()) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+    });
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const el = n.parentElement;
+      if (el && el.getBoundingClientRect().width > 0) return el;
+    }
+    return null;
+  }
 
   async function ensureBackgroundSync() {
     if (bgSyncDone || bgSyncRunning || !hiddenNow() || !document.getElementById('side')) return;
     bgSyncRunning = true;
+    bgSyncDone = true; // uma tentativa por dia, dando certo ou não (sem loop se a tela mudar)
+    let opened = false;
+    let enabled = false;
     try {
       const settings = railButton(['Configurações', 'Settings']) || railButton(['Você', 'You']);
       if (!settings) return;
       settings.click();
+      opened = true;
       await wait(1200);
       if (!hiddenNow()) return;
-      const item = panelNodes()
-        .find((e) => e.childElementCount === 0 && /^(notificações|notifications)$/i.test(e.textContent.trim()));
+      const item = findPanelText(/^(notificações|notifications)$/i);
       if (!item) return;
       clickable(item).click();
       await wait(1200);
       if (!hiddenNow()) return;
-      const toggle = [...document.querySelectorAll('#app input[role="switch"], #app input[type="checkbox"]')]
-        .find((input) => {
-          let row = input;
-          for (let i = 0; i < 6 && row.parentElement; i++) row = row.parentElement;
-          return BG_SYNC.test(row.textContent);
-        });
+      // O interruptor é o único dentro do menor bloco que contém o texto da opção.
+      const label = findPanelText(BG_SYNC);
+      let toggle = null;
+      for (let el = label; el && !toggle; el = el.parentElement) {
+        const switches = el.querySelectorAll('input[role="switch"], input[type="checkbox"]');
+        if (switches.length === 1) toggle = switches[0];
+        else if (switches.length > 1) break;
+      }
       if (!toggle) return;
       if (!toggle.checked) {
         toggle.click();
         await wait(500);
         post({ type: 'log', message: 'sincronização em segundo plano estava desligada: ligada automaticamente' });
       }
-      bgSyncDone = true;
-      post({ type: 'bgsync' });
+      enabled = toggle.checked;
     } finally {
       bgSyncRunning = false;
-      if (hiddenNow()) railButton(['Conversas', 'Chats'])?.click();
+      post({ type: 'bgsync', ok: enabled });
+      if (opened) railButton(['Conversas', 'Chats'])?.click(); // volta às conversas só se abriu as configurações
     }
   }
 
@@ -442,18 +482,26 @@
   }
 
   function hidePromos() {
+    // Marcações que não batem mais (o WhatsApp reaproveita elementos) são desfeitas.
+    document.querySelectorAll('[data-nz-hide]').forEach((el) => {
+      if (!PROMO.test(el.textContent)) el.removeAttribute('data-nz-hide');
+    });
+    const tooBig = (el) => el.textContent.length > 150 || !!el.querySelector('#pane-side, [role="row"], [role="listitem"]');
     const roots = [document.querySelector('[data-nz="side"]'), document.querySelector('[data-nz="main"]')].filter(Boolean);
     for (const r of roots) {
-      const walker = document.createTreeWalker(r, NodeFilter.SHOW_TEXT);
+      // Não entra na conversa aberta, na lista de conversas nem no que já está escondido.
+      const walker = document.createTreeWalker(r, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => n.nodeType === Node.ELEMENT_NODE
+          ? (n.matches('#main, #pane-side, [data-nz-hide]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP)
+          : (/mac|windows/i.test(n.data) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+      });
       for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-        if (!/mac|windows/i.test(n.data)) continue;
         let el = n.parentElement;
-        if (!el || el.closest('#main, #pane-side [role="row"], #pane-side [role="listitem"], [data-nz-hide]')) continue;
-        while (el && el !== r && !PROMO.test(el.textContent)) el = el.parentElement;
-        if (!el || el === r) continue;
+        while (el && el !== r && !PROMO.test(el.textContent) && !tooBig(el)) el = el.parentElement;
+        if (!el || el === r || tooBig(el) || !PROMO.test(el.textContent)) continue;
         // Sobe enquanto o pai ainda for só o banner (texto curto, caixa baixa).
-        while (el.parentElement && el.parentElement !== r && el.parentElement.textContent.length < 120
-          && el.parentElement.getBoundingClientRect().height < 120) el = el.parentElement;
+        while (el.parentElement && el.parentElement !== r && !tooBig(el.parentElement)
+          && el.parentElement.textContent.length < 120 && el.parentElement.getBoundingClientRect().height < 120) el = el.parentElement;
         el.setAttribute('data-nz-hide', '');
       }
     }
@@ -466,6 +514,17 @@
     if (!(t instanceof Element)) return;
     if (t.closest('#main')) setView('chat');
     else if (sidePane && sidePane.contains(t)) setView('list');
+  }, true);
+
+  const chatTitle = () => document.querySelector('#main header [data-testid="conversation-info-header-chat-title"]')?.textContent || null;
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!(t instanceof Element) || !t.closest('#pane-side [role="row"], #pane-side [role="listitem"]')) return;
+    const before = chatTitle();
+    setTimeout(() => {
+      const after = chatTitle();
+      if (after && after !== before) setView('chat');
+    }, 400);
   }, true);
 
   // Só tirar o foco não basta: com o foco no <body>, o WhatsApp devolve na hora
@@ -547,9 +606,15 @@
   // WhatsApp marca como lida a mensagem que aparece na conversa aberta, e a página
   // escondida continua com o layout montado. Enquanto oculta, a área de mensagens
   // sai do layout (CSS em html[data-nz-hidden]).
+  let warnedNoMessages = false;
   function applyHidden() {
     if (document.visibilityState === 'visible') delete root.dataset.nzHidden;
     else root.dataset.nzHidden = '';
+    if (!warnedNoMessages && root.dataset.nzHidden === '' && document.getElementById('main')
+      && !document.querySelector('#main [data-testid="conversation-panel-messages"]')) {
+      warnedNoMessages = true;
+      post({ type: 'log', message: 'área de mensagens não encontrada: a proteção contra leitura da guia escondida pode não estar funcionando' });
+    }
   }
   document.addEventListener('visibilitychange', applyHidden);
   applyHidden();

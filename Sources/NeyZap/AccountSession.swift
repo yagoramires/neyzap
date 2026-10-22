@@ -31,6 +31,8 @@ final class AccountSession: NSObject {
     private var titleObservation: NSKeyValueObservation?
     private var notificationIDs: [String: String] = [:] // id no JS → id na Central
     private var downloads: [ObjectIdentifier: URL] = [:]
+    private var recentCrashes: [Date] = []
+    private static let externalSchemes: Set<String> = ["mailto", "tel", "sms", "facetime", "facetime-audio"]
 
     init(account: Account) {
         accountID = account.id
@@ -158,7 +160,14 @@ final class AccountSession: NSObject {
 
 extension AccountSession: WKScriptMessageHandler {
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+        // Só o próprio script, no quadro principal do WhatsApp Web (não iframes de prévias).
+        guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == "web.whatsapp.com",
+              let raw = message.body as? [String: Any], let type = raw["type"] as? String else { return }
+        let body = raw.mapValues { value -> Any in
+            guard let text = value as? String else { return value }
+            // Texto de notificação e de log tem tamanho limitado; a foto (data URL) pode ser maior.
+            return String(text.prefix(text.hasPrefix("data:image/") ? 3_000_000 : 2_000))
+        }
         switch type {
         case "notify":
             guard let jsID = body["id"] as? String else { return }
@@ -188,8 +197,11 @@ extension AccountSession: WKScriptMessageHandler {
                 silent: body["silent"] as? Bool ?? false
             )
         case "bgsync":
+            // Tentativa registrada mesmo sem sucesso: a próxima só amanhã (sem loop).
             UserDefaults.standard.set(Date(), forKey: "bgSyncCheckedAt-\(accountID.uuidString)")
-            Log.write("[\(name)] sincronização em segundo plano conferida (ligada)")
+            Log.write((body["ok"] as? Bool ?? false)
+                ? "[\(name)] sincronização em segundo plano conferida (ligada)"
+                : "[\(name)] não achei a opção de sincronização em segundo plano; tento de novo amanhã")
         case "log":
             Log.write("[\(name)] \(body["message"] as? String ?? "")")
         case "archived":
@@ -229,16 +241,29 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
         }
         let isMainFrame = action.targetFrame?.isMainFrame ?? true
         let isWeb = scheme == "http" || scheme == "https"
-        if (isWeb && isMainFrame && !Self.isWhatsApp(url.host)) || ["mailto", "tel", "sms", "facetime"].contains(scheme) {
+        if Self.externalSchemes.contains(scheme) {
             NSWorkspace.shared.open(url)
             decisionHandler(.cancel)
             return
         }
-        decisionHandler(.allow)
+        if isMainFrame {
+            // A guia só mostra o WhatsApp Web; FAQ, site e qualquer outro link abrem no navegador.
+            if scheme == "https" && url.host?.lowercased() == "web.whatsapp.com" || url.absoluteString == "about:blank" {
+                decisionHandler(.allow)
+            } else {
+                if isWeb { NSWorkspace.shared.open(url) }
+                decisionHandler(.cancel)
+            }
+            return
+        }
+        // Dentro da página (iframes, mídia): só esquemas web e internos.
+        decisionHandler(isWeb || ["about", "blob", "data"].contains(scheme) ? .allow : .cancel)
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        decisionHandler(response.canShowMIMEType ? .allow : .download)
+        let disposition = (response.response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
+        let attachment = disposition.lowercased().hasPrefix("attachment")
+        decisionHandler(response.canShowMIMEType && !attachment ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -273,7 +298,20 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
         Log.write("[\(name)] falha ao conectar: \(error.localizedDescription)")
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // Página nova: as notificações da carga anterior não têm mais a quem responder.
+        Notifier.shared.remove(Array(notificationIDs.values))
+        notificationIDs.removeAll()
+        BannerCenter.shared.dismissAll(accountID: accountID)
+    }
+
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        // Recarrega, mas sem entrar em loop se a página insistir em travar.
+        recentCrashes = recentCrashes.filter { $0.timeIntervalSinceNow > -60 } + [Date()]
+        guard recentCrashes.count <= 3 else {
+            Log.write("[\(name)] a página travou \(recentCrashes.count) vezes em 1 min; não vou recarregar sozinho (use Recarregar, ⌘R)")
+            return
+        }
         Log.write("[\(name)] processo da página encerrou; recarregando")
         webView.reload()
     }
@@ -285,14 +323,21 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
     }
 
     func downloadDidFinish(_ download: WKDownload) {
-        guard let url = downloads.removeValue(forKey: ObjectIdentifier(download)) else { return }
+        guard var url = downloads.removeValue(forKey: ObjectIdentifier(download)) else { return }
+        // Marca de "baixado da internet": o macOS avisa antes de abrir instaladores e apps.
+        var values = URLResourceValues()
+        values.quarantineProperties = [
+            kLSQuarantineAgentNameKey as String: "NeyZap",
+            kLSQuarantineTypeKey as String: kLSQuarantineTypeWebDownload as String,
+        ]
+        try? url.setResourceValues(values)
         // Faz a pilha de Downloads do Dock pular, como no Safari.
         DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: url.path)
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
         downloads.removeValue(forKey: ObjectIdentifier(download))
-        NSLog("NeyZap: download falhou: %@", error.localizedDescription)
+        Log.write("[\(name)] download falhou: \(error.localizedDescription)")
     }
 }
 
@@ -300,7 +345,8 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
 
 extension AccountSession: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        if let url = action.request.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+        if let url = action.request.url, let scheme = url.scheme?.lowercased(),
+           scheme == "http" || scheme == "https" || Self.externalSchemes.contains(scheme) {
             NSWorkspace.shared.open(url)
         }
         return nil
@@ -319,7 +365,7 @@ extension AccountSession: WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
-        decisionHandler(Self.isWhatsApp(origin.host) ? .grant : .deny)
+        decisionHandler(origin.protocol == "https" && origin.host == "web.whatsapp.com" ? .grant : .deny)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {

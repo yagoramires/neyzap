@@ -62,6 +62,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         tabBar.onRename = { [weak self] id, name in self?.rename(accountID: id, to: name) }
         tabBar.onClose = { [weak self] id in self?.confirmClose(accountID: id) }
         tabBar.onResetSession = { [weak self] id in self?.confirmReset(accountID: id) }
+        tabBar.onEditingEnded = { [weak self] in
+            guard let self else { return }
+            self.window?.makeFirstResponder(self.activeSession.webView)
+        }
 
         let toolbar = NSToolbar(identifier: "main")
         toolbar.delegate = self
@@ -82,7 +86,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     private func makeSession(_ account: Account) -> AccountSession {
         let session = AccountSession(account: account)
         session.onUnreadChange = { [weak self] in
-            self?.refreshPicker()
+            self?.refreshTabs()
             self?.onUnreadChange?()
         }
         return session
@@ -113,7 +117,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         guard let session = sessions.first(where: { $0.accountID == accountID }) else { return }
         session.name = name
         AccountStore.shared.rename(accountID, to: name)
-        refreshPicker()
+        refreshTabs()
         onAccountsChange?()
     }
 
@@ -132,7 +136,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             confirm: "Fechar guia",
             destructive: true
         )
-        if ok { remove(accountID: accountID) }
+        if ok { remove(session) }
     }
 
     func confirmReset(accountID: UUID) {
@@ -146,17 +150,25 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         if ok { session.resetSession() }
     }
 
-    private func remove(accountID id: UUID) {
-        guard sessions.count > 1, let session = sessions.first(where: { $0.accountID == id }) else { return }
-        let wasSelected = session === selectedSession
+    private func remove(_ session: AccountSession) {
+        let id = session.accountID
+        // A seleção continua na mesma guia (pelo id): mudar sozinha traria outra conta
+        // para a tela e marcaria as mensagens dela como lidas.
+        let keep = session === selectedSession ? nil : selectedSession.accountID
+        let removedIndex = sessions.firstIndex { $0 === session } ?? selectedIndex
         session.webView.removeFromSuperview()
         sessions.removeAll { $0 === session }
         AccountStore.shared.remove(id)
-        if wasSelected || selectedIndex >= sessions.count { selectedIndex = min(selectedIndex, sessions.count - 1) }
+        BannerCenter.shared.dismissAll(accountID: id)
+        defaults.removeObject(forKey: "bgSyncCheckedAt-\(id.uuidString)")
+        if let keep, let i = sessions.firstIndex(where: { $0.accountID == keep }) {
+            selectedIndex = i
+        } else {
+            selectedIndex = min(removedIndex, sessions.count - 1)
+        }
         defaults.set(selectedIndex, forKey: "selectedAccount")
         layoutSessions()
-        onUnreadChange?()
-        onAccountsChange?()
+        onUnreadChange?() // atualiza selos, Dock e menus
         // Dá tempo da WebView ser liberada antes de apagar o armazenamento.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             WKWebsiteDataStore.remove(forIdentifier: id) { error in
@@ -169,8 +181,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         guard let i = sessions.firstIndex(where: { $0.accountID == id }) else { return }
         if isSideBySide {
             selectedIndex = i
+            defaults.set(i, forKey: "selectedAccount")
             window?.makeFirstResponder(selectedSession.webView)
-            refreshPicker()
+            refreshTabs()
         } else {
             select(index: i)
         }
@@ -191,9 +204,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         parkHiddenSessions(except: visible)
         updateMinimumSize(panes: visible.count)
         splitView.adjustSubviews()
-        equalizePanes()
+        // Só redistribui quando muda o número de colunas (preserva divisórias arrastadas).
+        if visible.count != lastPaneCount {
+            equalizePanes()
+            lastPaneCount = visible.count
+        }
         window?.makeFirstResponder(selectedSession.webView)
-        refreshPicker()
+        refreshTabs()
         refreshToolbar()
     }
 
@@ -226,9 +243,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     }
 
     /// Cada conta visível precisa de pelo menos 340 px (320 com uma só).
+    private var lastPaneCount = 0
+
     private func updateMinimumSize(panes: Int) {
         guard let window else { return }
-        let width = panes > 1 ? CGFloat(panes) * 340 + splitView.dividerThickness * CGFloat(panes - 1) : 320
+        let wanted = panes > 1 ? CGFloat(panes) * 340 + splitView.dividerThickness * CGFloat(panes - 1) : 320
+        let screenWidth = (window.screen ?? NSScreen.main)?.visibleFrame.width ?? wanted
+        let width = min(wanted, screenWidth) // muitas guias lado a lado: não passa da tela
         window.minSize = NSSize(width: width, height: 420)
         if window.frame.width < width {
             var frame = window.frame
@@ -295,7 +316,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         return item
     }
 
-    private func refreshPicker() {
+    private func refreshTabs() {
+        tabBar.maxWidth = max(120, (window?.frame.width ?? 800) - 190)
         let tabs = sessions.map { TabBarView.Tab(id: $0.accountID, name: $0.name, unread: $0.unread, archived: $0.archivedUnread) }
         tabBar.update(tabs: tabs, selected: sessions.indices.contains(selectedIndex) ? selectedSession.accountID : nil)
     }
@@ -321,6 +343,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     // MARK: - Janela
 
     /// Fechar só esconde: o app continua recebendo mensagens e notificando.
+    func windowDidResize(_ notification: Notification) {
+        tabBar.maxWidth = max(120, (window?.frame.width ?? 800) - 190)
+    }
+
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
         return false

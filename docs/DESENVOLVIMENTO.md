@@ -8,20 +8,27 @@ Precisa só das Command Line Tools (`xcode-select --install`); não precisa do X
 scripts/setup-signing.sh          # (uma vez) certificado local "NeyZap Local Signing"
 scripts/install.sh                # versão final → /Applications/NeyZap.app (e abre)
 scripts/install.sh --no-restart   # instala sem fechar o app aberto
+scripts/restart.sh                # fecha o app do jeito normal (como ⌘Q) e abre de novo
 scripts/build.sh [debug] [--run]  # só compila em build/NeyZap.app
 swift scripts/make-icon.swift     # gera Resources/AppIcon.icns de design/icon-source.png
 ```
 
 Assinar sempre com o mesmo certificado faz o macOS reconhecer as builds como o
-mesmo app. A chave mestra do WebCrypto (que protege as chaves do WhatsApp no
+mesmo app; sem o certificado, o `build.sh` para (use `ALLOW_ADHOC=1` para assinar
+ad-hoc assim mesmo). A assinatura usa o runtime reforçado, com câmera e microfone
+liberados em `Resources/NeyZap.entitlements`. Nunca abra duas cópias do app ao mesmo
+tempo (o app recusa, e os scripts usam `open` sem `-n`): elas dividiriam os mesmos
+dados das guias. A chave mestra do WebCrypto (que protege as chaves do WhatsApp no
 IndexedDB) é entregue pelo próprio app ao WebKit e fica em
 `~/Library/Application Support/NeyZap/webcrypto.key`, então o Chaveiro não pede
 senha a cada build.
 
 ## Publicar uma versão
 
-1. Suba `CFBundleShortVersionString` em `Resources/Info.plist`.
-2. `scripts/build.sh` e `ditto -c -k --keepParent build/NeyZap.app NeyZap-X.Y.Z.zip`.
+1. Suba `CFBundleShortVersionString` **e** `CFBundleVersion` em `Resources/Info.plist`.
+2. `scripts/build.sh`, confira a assinatura (`codesign -dv build/NeyZap.app` deve
+   mostrar `Authority=NeyZap Local Signing`) e
+   `ditto -c -k --keepParent build/NeyZap.app NeyZap-X.Y.Z.zip`.
 3. `gh release create vX.Y.Z NeyZap-X.Y.Z.zip` — o app avisa quem estiver numa versão anterior.
 
 ## Tema
@@ -52,16 +59,24 @@ para ajustar o layout quando o WhatsApp muda.
 
 ### Depuração pelo terminal
 
-Desligada por padrão. Com `defaults write local.neyzap debugBridge -bool true`,
-o `scripts/debug.sh` manda comandos para o app aberto (saída em `debug/`):
+Desligada por padrão. **Ligada, ela permite rodar qualquer JavaScript nas guias
+logadas** (ler conversas, agir na tela) — use só enquanto desenvolve e desligue
+depois (`defaults write local.neyzap debugBridge -bool false`).
+
+Com `defaults write local.neyzap debugBridge -bool true` e o app reaberto, ele cria
+uma senha em `~/Library/Application Support/NeyZap/debug/token` (arquivo 0600) e só
+aceita comandos que começam com ela. O `scripts/debug.sh` lê a senha e manda o
+comando (saída em `debug/`, arquivos 0600):
 
 | Comando | Efeito |
 | --- | --- |
-| `dump` / `snap` | estrutura da página / captura de cada conta visível |
-| `size 420x700`, `front`, `side on\|off`, `select <conta>` | janela e contas |
+| `dump` / `snap` | estrutura da página / captura das guias na tela |
+| `size 420x700`, `front`, `side on\|off`, `select <guia>` | janela e guias |
 | `hot <pasta>` | recarrega `layout.css` e `inject.js` da pasta, sem recompilar |
-| `eval <expr>` | avalia uma expressão de leitura na conta selecionada |
-| `click X Y`, `esc`, `reload`, `reset <conta>` | interação e sessão |
+| `eval <expr>` / `evalin <guia> <expr>` | roda uma expressão JS na guia selecionada / numa guia específica |
+| `click X Y`, `esc`, `reload`, `reset <guia>` | interação e sessão |
+
+Nomes de guia podem ter espaços (`evalin WhatsApp 2 document.title`).
 
 ## Regras do `inject.js`
 
@@ -81,7 +96,8 @@ segundo plano** se estiver desligada, voltando em seguida às conversas.
 ```
 Sources/NeyZap/
   AppDelegate.swift           menus (app e Dock), atalho global, badge, atualizações
-  MainWindowController.swift  janela, abas de conta com selo, lado a lado, fixar
+  MainWindowController.swift  janela, guias (criar, renomear, fechar), lado a lado, fixar
+  TabBar.swift                barra de guias no estilo navegador
   AccountSession.swift        WKWebView por conta, downloads, notificações, permissões
   NotificationBanner.swift    notificações com a foto do contato
   Notifier.swift              Central de Notificações (modo "notificações do sistema")

@@ -19,7 +19,8 @@ final class HotKey {
         }, 1, &spec, context, &handlerRef)
 
         let id = EventHotKeyID(signature: OSType(0x4E595A50), id: 1) // "NYZP"
-        RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), id, GetApplicationEventTarget(), 0, &hotKeyRef)
+        let status = RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), id, GetApplicationEventTarget(), 0, &hotKeyRef)
+        if status != noErr { Log.write("atalho global indisponível (outro app usa a combinação?): erro \(status)") }
     }
 
     deinit {
