@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         BannerCenter.shared.onClick = openNotification
 
         windowController = MainWindowController()
+        windowController.onAccountsChange = { [weak self] in self?.refreshAccountsMenu() }
         windowController.onUnreadChange = { [weak self] in
             self?.updateBadges()
             self?.refreshAccountsMenu()
@@ -61,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             menu.addItem(entry)
         }
         menu.addItem(.separator())
-        menu.addItem(item("Conectar outro número…", #selector(addAccount), ""))
+        menu.addItem(item("Nova guia", #selector(addAccount), ""))
         menu.addItem(.separator())
         menu.addItem(item("Verificar atualizações…", #selector(checkForUpdates), ""))
         menu.addItem(item("Logs de depuração", #selector(openLogs), ""))
@@ -215,9 +216,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
         menu.addItem(.separator())
         if menu === accountsMenu {
-            menu.addItem(item("Conectar outro número…", #selector(addAccount), "n", [.command, .shift]))
-            menu.addItem(item("Renomear conta…", #selector(renameAccount), ""))
-            menu.addItem(item("Remover conta…", #selector(removeAccount), ""))
+            menu.addItem(item("Nova guia", #selector(addAccount), "t"))
+            menu.addItem(item("Renomear guia…", #selector(renameAccount), ""))
+            menu.addItem(item("Fechar guia…", #selector(removeAccount), ""))
             menu.addItem(.separator())
             menu.addItem(item("Recarregar", #selector(reload), "r"))
             menu.addItem(item("Limpar sessão (novo QR code)…", #selector(resetSession), ""))
@@ -247,46 +248,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         refreshAccountsMenu()
     }
 
-    @objc private func addAccount() {
-        let n = windowController.sessions.count + 1
-        guard let name = Dialogs.prompt(title: "Nova conta", message: "Dê um nome para identificar este número.", defaultValue: "Conta \(n)", confirm: "Adicionar") else { return }
-        windowController.addAccount(named: name)
-        refreshAccountsMenu()
-    }
-
-    @objc private func renameAccount() {
-        let session = windowController.activeSession
-        guard let name = Dialogs.prompt(title: "Renomear conta", defaultValue: session.name, confirm: "Renomear") else { return }
-        windowController.renameActiveAccount(to: name)
-        refreshAccountsMenu()
-    }
-
-    @objc private func removeAccount() {
-        let session = windowController.activeSession
-        let ok = Dialogs.confirm(
-            title: "Remover “\(session.name)”?",
-            message: "A sessão do WhatsApp Web desta conta será apagada deste Mac. Lembre de desconectar o aparelho também no celular (Aparelhos conectados).",
-            confirm: "Remover",
-            destructive: true
-        )
-        if ok {
-            windowController.removeActiveAccount()
-            refreshAccountsMenu()
-        }
-    }
+    @objc private func addAccount() { windowController.newTab() }
+    @objc private func renameAccount() { windowController.promptRename(accountID: windowController.activeSession.accountID) }
+    @objc private func removeAccount() { windowController.confirmClose(accountID: windowController.activeSession.accountID) }
+    @objc private func resetSession() { windowController.confirmReset(accountID: windowController.activeSession.accountID) }
 
     @objc private func reload() { windowController.activeSession.reload() }
 
-    @objc private func resetSession() {
-        let session = windowController.activeSession
-        let ok = Dialogs.confirm(
-            title: "Limpar a sessão de “\(session.name)”?",
-            message: "Os dados do WhatsApp Web desta conta serão apagados deste Mac e o QR code aparecerá de novo. Desconecte o aparelho antigo no celular (Aparelhos conectados).",
-            confirm: "Limpar",
-            destructive: true
-        )
-        if ok { session.resetSession() }
-    }
     @objc private func goBack() { windowController.activeSession.back() }
     @objc private func toggleSideBySide() { windowController.toggleSideBySide(nil) }
     @objc private func togglePinned() { windowController.togglePinned(nil) }

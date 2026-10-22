@@ -28,9 +28,12 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
 
 ## ✨ Recursos
 
-- **Vários números ao mesmo tempo** — uma aba por conta (⌘1, ⌘2…), com selo
-  vermelho de não lidas (e um cinza para as arquivadas), ou todas **lado a lado** (⌘\\). Conecte outro número pelo
-  menu do ícone no Dock.
+- **Guias como num navegador** — cada guia é um número de WhatsApp, com inicial
+  colorida, selo vermelho de não lidas e cinza de arquivadas. **+** (⌘T) abre outra
+  guia e mostra o QR para conectar mais um número; duplo clique renomeia; o **×**
+  fecha. As guias funcionam de forma independente: a que está fora da tela continua
+  recebendo e notificando, sem marcar nada como lido. Também dá para ver todas
+  **lado a lado** (⌘\\).
 - **Janela de qualquer tamanho** — abaixo de 760 px vira uma coluna por vez, como
   no celular, com botão de voltar (⌘[). Painéis, emojis, fotos e prévias de envio
   se ajustam à largura.
@@ -65,11 +68,11 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
 | Atalho | Ação |
 | --- | --- |
 | ⌃⌥Z | Mostrar/esconder o NeyZap de qualquer lugar |
-| ⌘1 … ⌘9 | Trocar de conta |
-| ⌘\\ | Contas lado a lado |
+| ⌘1 … ⌘9 | Trocar de guia |
+| ⌘\\ | Guias lado a lado |
 | ⌘[ | Voltar para a lista (janela estreita) |
 | ⌥⌘T | Sempre na frente |
-| ⌘⇧N | Conectar outro número |
+| ⌘T | Nova guia (conectar outro número) |
 | ⌘+ / ⌘− / ⌘0 | Zoom |
 | ⌘W / ⌘Q | Esconder janela / encerrar |
 
