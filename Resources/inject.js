@@ -319,7 +319,7 @@
 
   function schedulePromoScan() {
     if (promoTimer) return;
-    promoTimer = setTimeout(() => { promoTimer = 0; hidePromos(); }, 1500);
+    promoTimer = setTimeout(() => { promoTimer = 0; housekeeping(); }, 1500);
   }
 
   // Aviso "As notificações de mensagens estão desativadas": depois de logar de
@@ -342,10 +342,46 @@
     }
   }
 
+  // Não lidas arquivadas: o título da página só conta as conversas normais; o
+  // número das arquivadas aparece na linha "Arquivadas" da lista (só leitura).
+  let lastArchived = -1;
+  function reportArchived() {
+    const row = document.querySelector('[data-testid="chatlist-panel-archived-button"]');
+    let count = 0;
+    if (row) {
+      const digits = [...row.querySelectorAll('*')].find((e) => e.childElementCount === 0 && /^\d+$/.test(e.textContent.trim()));
+      count = digits ? parseInt(digits.textContent.trim(), 10) : 0;
+    }
+    if (count !== lastArchived) {
+      lastArchived = count;
+      post({ type: 'archived', count });
+    }
+  }
+
+  // Título "WhatsApp" no topo da lista vira "NeyZap" quando é texto (quando é o
+  // logotipo em SVG, o CSS troca). Contatos e mensagens nunca são tocados.
+  function renameTitle() {
+    const side = document.querySelector('[data-nz="side"]');
+    if (!side) return;
+    const top = side.getBoundingClientRect().top;
+    const walker = document.createTreeWalker(side, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.data.trim();
+      if (text !== 'WhatsApp' && text !== 'WhatsApp Business') continue;
+      const el = n.parentElement;
+      if (!el || el.closest('#pane-side') || el.getBoundingClientRect().top - top > 80) continue;
+      n.data = n.data.replace(text, 'NeyZap');
+    }
+  }
+
+  // Tarefas periódicas: cada uma isolada, para uma falha não derrubar as outras.
+  function housekeeping() {
+    for (const task of [enableNotifications, reportArchived, renameTitle, hidePromos]) {
+      try { task(); } catch (e) { post({ type: 'log', message: `erro em ${task.name}: ${e}` }); }
+    }
+  }
+
   function hidePromos() {
-    enableNotifications();
-    reportArchived();
-    renameTitle();
     const roots = [document.querySelector('[data-nz="side"]'), document.querySelector('[data-nz="main"]')].filter(Boolean);
     for (const r of roots) {
       const walker = document.createTreeWalker(r, NodeFilter.SHOW_TEXT);

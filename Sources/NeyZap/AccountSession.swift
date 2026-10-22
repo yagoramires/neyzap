@@ -190,6 +190,7 @@ extension AccountSession: WKScriptMessageHandler {
             Log.write("[\(name)] \(body["message"] as? String ?? "")")
         case "archived":
             archivedUnread = body["count"] as? Int ?? 0
+            Log.write("[\(name)] arquivadas não lidas: \(archivedUnread)")
         case "notifyClose":
             guard let jsID = body["id"] as? String else { return }
             BannerCenter.shared.dismiss(accountID: accountID, jsID: jsID)
