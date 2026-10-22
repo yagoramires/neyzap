@@ -342,7 +342,24 @@
     }
   }
 
+  // Não lidas arquivadas: o título da página só conta as conversas normais; o
+  // número das arquivadas aparece na linha "Arquivadas" da lista (só leitura).
+  let lastArchived = -1;
+  function reportArchived() {
+    const row = document.querySelector('[data-testid="chatlist-panel-archived-button"]');
+    let count = 0;
+    if (row) {
+      const digits = [...row.querySelectorAll('*')].find((e) => e.childElementCount === 0 && /^\d+$/.test(e.textContent.trim()));
+      count = digits ? parseInt(digits.textContent.trim(), 10) : 0;
+    }
+    if (count !== lastArchived) {
+      lastArchived = count;
+      post({ type: 'archived', count });
+    }
+  }
+
   function hidePromos() {
+    reportArchived();
     renameTitle();
     const bar = document.querySelector('[data-testid="chat-butterbar"]');
     if (bar) {

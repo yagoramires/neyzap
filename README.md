@@ -29,7 +29,7 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
 ## ✨ Recursos
 
 - **Vários números ao mesmo tempo** — uma aba por conta (⌘1, ⌘2…), com selo
-  vermelho de não lidas, ou todas **lado a lado** (⌘\\). Conecte outro número pelo
+  vermelho de não lidas (e um cinza para as arquivadas), ou todas **lado a lado** (⌘\\). Conecte outro número pelo
   menu do ícone no Dock.
 - **Janela de qualquer tamanho** — abaixo de 760 px vira uma coluna por vez, como
   no celular, com botão de voltar (⌘[). Painéis, emojis, fotos e prévias de envio

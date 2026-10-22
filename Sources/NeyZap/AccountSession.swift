@@ -23,6 +23,10 @@ final class AccountSession: NSObject {
     private(set) var unread = 0 {
         didSet { if unread != oldValue { onUnreadChange?() } }
     }
+    /// Conversas arquivadas não lidas (lidas da linha "Arquivadas" da lista).
+    private(set) var archivedUnread = 0 {
+        didSet { if archivedUnread != oldValue { onUnreadChange?() } }
+    }
 
     private var titleObservation: NSKeyValueObservation?
     private var notificationIDs: [String: String] = [:] // id no JS → id na Central
@@ -165,6 +169,8 @@ extension AccountSession: WKScriptMessageHandler {
                 tag: tag,
                 silent: body["silent"] as? Bool ?? false
             )
+        case "archived":
+            archivedUnread = body["count"] as? Int ?? 0
         case "notifyClose":
             guard let jsID = body["id"] as? String else { return }
             BannerCenter.shared.dismiss(accountID: accountID, jsID: jsID)
