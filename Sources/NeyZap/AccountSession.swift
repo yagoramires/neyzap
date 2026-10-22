@@ -41,12 +41,12 @@ final class AccountSession: NSObject {
         config.applicationNameForUserAgent = "Version/\(Self.safariVersion) Safari/605.1.15"
         config.mediaTypesRequiringUserActionForPlayback = []
         config.preferences.isElementFullscreenEnabled = true
-        // Contas independentes: a aba escondida (ou a janela fechada) continua
-        // rodando a todo vapor, senão o WebKit congela a página e as mensagens só
-        // chegam (e notificam) quando a aba volta para a tela.
+        // Contas independentes: sem isso o WebKit suspende o processo da página
+        // escondida (aba fora da tela ou janela fechada) e as mensagens só chegam,
+        // e notificam, quando a aba volta. Os temporizadores da página escondida
+        // continuam desacelerados (economia de bateria); as mensagens chegam pela
+        // conexão de rede, que não depende deles.
         Self.setPrivatePreference(config.preferences, "_setPageVisibilityBasedProcessSuppressionEnabled:", false)
-        Self.setPrivatePreference(config.preferences, "_setHiddenPageDOMTimerThrottlingEnabled:", false)
-        Self.setPrivatePreference(config.preferences, "_setHiddenPageDOMTimerThrottlingAutoIncreases:", false)
         webView = WKWebView(frame: .zero, configuration: config)
 
         super.init()
