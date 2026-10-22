@@ -90,13 +90,19 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
 - Tudo fica no seu Mac: sessões em armazenamentos separados por conta, nada é
   enviado para servidores além do próprio WhatsApp. A verificação de atualização
   só consulta a lista de versões deste repositório.
+- A chave que protege as sessões fica num arquivo que só o seu usuário lê
+  (`~/Library/Application Support/NeyZap/webcrypto.key`), e não no Chaveiro: sem
+  conta de desenvolvedor da Apple, o Chaveiro pediria a senha a cada atualização do
+  app. Quem tem acesso ao seu usuário do Mac consegue ler esse arquivo, como
+  acontece com os dados de qualquer navegador.
 - O log de depuração (`NeyZap → Logs de depuração`) registra eventos do app,
   nunca o conteúdo das conversas.
 - Arquivos baixados das conversas ganham a marca de "baixado da internet", então o
   macOS avisa antes de abrir instaladores e apps. Links externos abrem no navegador.
 - Para desenvolvimento existe um canal de depuração pelo terminal capaz de rodar
   código nas guias abertas. Ele vem **desligado** e, mesmo ligado, só aceita
-  comandos com uma senha guardada num arquivo que só o seu usuário lê
+  comandos com uma senha nova a cada abertura, guardada num arquivo que só o seu
+  usuário lê
   (veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md)).
 
 ## ⚠️ Limitações

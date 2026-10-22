@@ -1,11 +1,14 @@
 import AppKit
 import Security
 
-/// Comandos de depuração vindos do terminal. **Desligado por padrão** e, ligado,
-/// só aceita comandos que comecem com a senha do arquivo `debug/token` (0600) —
-/// sem ela, qualquer programa do usuário poderia rodar JavaScript nas contas logadas.
+/// Comandos de depuração vindos do terminal. **Desligado por padrão.** Ligado, o
+/// comando vem no arquivo `debug/command` (pasta 0700) e precisa começar com a senha
+/// de `debug/token` (0600, nova a cada abertura do app). A notificação que avisa do
+/// comando não leva dado nenhum: nada de senha ou comando passando por um canal que
+/// outros programas escutam. Desligado, a senha é apagada.
 ///
 ///   defaults write local.neyzap debugBridge -bool true   (e reabrir o app)
+///   scripts/debug.sh <comando>   (grava debug/command e avisa o app)
 ///   scripts/debug.sh dump | snap | size 420x700 | front | reload | side on|off
 ///   scripts/debug.sh select <guia> | reset <guia> | eval <expr> | evalin <guia> <expr>
 ///   scripts/debug.sh click X Y | esc | hot <pasta com layout.css e inject.js>
@@ -18,17 +21,44 @@ final class DebugBridge {
     private let token: String
     private var observer: NSObjectProtocol?
 
+    private static var commandURL: URL { AppPaths.debug.appendingPathComponent("command") }
+
     init?(windowController: MainWindowController) {
-        guard UserDefaults.standard.bool(forKey: "debugBridge") else { return nil }
+        guard UserDefaults.standard.bool(forKey: "debugBridge") else {
+            Self.cleanUp()
+            return nil
+        }
+        guard let token = Self.newToken() else {
+            Log.write("canal de depuração não ligou: sem gerador de números aleatórios")
+            return nil
+        }
         self.windowController = windowController
-        token = Self.loadOrCreateToken()
+        self.token = token
         Log.write("canal de depuração ligado")
-        observer = DistributedNotificationCenter.default().addObserver(forName: Self.name, object: nil, queue: .main) { [weak self] note in
-            self?.receive(note.object as? String ?? "")
+        observer = DistributedNotificationCenter.default().addObserver(forName: Self.name, object: nil, queue: .main) { [weak self] _ in
+            self?.receive()
+        }
+        // Ao encerrar, a senha deixa de existir até a próxima abertura.
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+            Self.cleanUp()
         }
     }
 
-    private func receive(_ message: String) {
+    /// Canal desligado: apaga a senha e o que a depuração deixou (capturas de tela
+    /// podem mostrar conversas).
+    private static func cleanUp() {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(at: AppPaths.debug, includingPropertiesForKeys: nil) else { return }
+        for file in files where ["token", "command", "eval.txt"].contains(file.lastPathComponent) || file.lastPathComponent.hasPrefix("snap-") {
+            try? fm.removeItem(at: file)
+        }
+    }
+
+    private func receive() {
+        let url = Self.commandURL
+        guard let data = try? Data(contentsOf: url) else { return }
+        try? FileManager.default.removeItem(at: url)
+        let message = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .newlines)
         guard message.hasPrefix(token + " ") else {
             Log.write("depuração: comando recusado (sem a senha)")
             return
@@ -44,7 +74,7 @@ final class DebugBridge {
             for session in windowController.sessions {
                 session.dumpLayout { json in
                     guard let json else { return }
-                    self.write(json, to: "layout-\(Self.safe(session.name)).json")
+                    self.write(json, to: "layout-\(AppPaths.safeName(session.name)).json")
                 }
             }
         case "snap":
@@ -53,7 +83,7 @@ final class DebugBridge {
                 session.webView.takeSnapshot(with: nil) { image, _ in
                     guard let image, let tiff = image.tiffRepresentation,
                           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return }
-                    self.write(png, to: "snap-\(Self.safe(session.name)).png")
+                    self.write(png, to: "snap-\(AppPaths.safeName(session.name)).png")
                 }
             }
         case "size":
@@ -149,27 +179,15 @@ final class DebugBridge {
     }
 
     private func write(_ data: Data, to name: String) {
-        let url = AppPaths.debug.appendingPathComponent(name)
-        try? data.write(to: url, options: .atomic)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        AppPaths.writePrivate(data, to: name)
     }
 
-    /// Nome de guia seguro para nome de arquivo (sem "/" nem "..").
-    private static func safe(_ name: String) -> String {
-        let cleaned = name.map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "_" }
-        return String(cleaned.prefix(40))
-    }
-
-    private static func loadOrCreateToken() -> String {
-        let url = AppPaths.debug.appendingPathComponent("token")
-        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: AppPaths.debug.path)
-        if let saved = try? String(contentsOf: url, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), saved.count >= 32 {
-            return saved
-        }
+    /// Senha nova a cada abertura (a de antes deixa de valer).
+    private static func newToken() -> String? {
         var bytes = [UInt8](repeating: 0, count: 24)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return nil }
         let token = bytes.map { String(format: "%02x", $0) }.joined()
-        FileManager.default.createFile(atPath: url.path, contents: Data(token.utf8), attributes: [.posixPermissions: 0o600])
+        guard AppPaths.writePrivate(Data(token.utf8), to: "token") != nil else { return nil }
         return token
     }
 }

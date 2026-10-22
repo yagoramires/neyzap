@@ -79,9 +79,13 @@ final class TabBarView: NSView {
             item.tab = tab
             item.isSelected = tab.id == selected
             item.canClose = tabs.count > 1
-            item.refreshHoverFromMouse()
         }
         invalidateIntrinsicContentSize()
+        // Guias novas ou que mudaram de lugar só têm tamanho depois do layout.
+        DispatchQueue.main.async { [weak self] in
+            self?.layoutSubtreeIfNeeded()
+            self?.items.forEach { $0.refreshHoverFromMouse() }
+        }
     }
 
     override var intrinsicContentSize: NSSize {
@@ -236,7 +240,9 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         label.currentEditor()?.selectAll(nil)
     }
 
-    private func endEditing(commit: Bool) {
+    /// `refocus`: Enter/Esc devolvem o foco ao WhatsApp; um clique em outro lugar
+    /// deixa o foco onde o clique o pôs.
+    private func endEditing(commit: Bool, refocus: Bool) {
         guard let original = editingOriginal else { return }
         editingOriginal = nil
         let name = label.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -248,23 +254,23 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         } else {
             label.stringValue = original
         }
-        onEditingEnded?()
+        if refocus { onEditingEnded?() }
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         if selector == #selector(NSResponder.cancelOperation(_:)) {
-            endEditing(commit: false)
+            endEditing(commit: false, refocus: true)
             return true
         }
         if selector == #selector(NSResponder.insertNewline(_:)) {
-            endEditing(commit: true)
+            endEditing(commit: true, refocus: true)
             return true
         }
         return false
     }
 
     func controlTextDidEndEditing(_ obj: Notification) {
-        endEditing(commit: true)
+        endEditing(commit: true, refocus: false)
     }
 
     @objc private func renameFromMenu() { beginEditing() }

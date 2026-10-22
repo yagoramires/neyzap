@@ -170,11 +170,50 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         layoutSessions()
         onUnreadChange?() // atualiza selos, Dock e menus
         // Dá tempo da WebView ser liberada antes de apagar o armazenamento.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            WKWebsiteDataStore.remove(forIdentifier: id) { error in
-                if let error { Log.write("não consegui apagar os dados da guia: \(error.localizedDescription)") }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { Self.deleteData(of: id, retries: 2) }
+    }
+
+    /// O WebKit pode demorar a largar o armazenamento ("in use"): tenta de novo mais
+    /// tarde e, em último caso, na próxima abertura do app.
+    private static func deleteData(of id: UUID, retries: Int = 0) {
+        WKWebsiteDataStore.remove(forIdentifier: id) { error in
+            guard let error else {
+                AccountStore.shared.forgetClosed(id)
+                return
+            }
+            if retries > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) { deleteData(of: id, retries: retries - 1) }
+            } else {
+                Log.write("não consegui apagar os dados da guia fechada (tento de novo ao abrir): \(error.localizedDescription)")
             }
         }
+    }
+
+    /// Armazenamentos sem guia na lista. Os de guias fechadas (remoção que falhou ou
+    /// foi interrompida) são apagados; qualquer outro volta como guia: se a lista de
+    /// guias se perder, as sessões reaparecem em vez de serem apagadas.
+    func reconcileDataStores() {
+        WKWebsiteDataStore.fetchAllDataStoreIdentifiers { [weak self] ids in
+            DispatchQueue.main.async { self?.reconcile(ids) }
+        }
+    }
+
+    private func reconcile(_ ids: [UUID]) {
+        let store = AccountStore.shared
+        let known = Set(store.accounts.map(\.id))
+        let unknown = ids.filter { !known.contains($0) }
+        for id in unknown where store.closed.contains(id) { Self.deleteData(of: id) }
+        for id in store.closed where !ids.contains(id) { store.forgetClosed(id) } // já não existem
+        let lost = unknown.filter { !store.closed.contains($0) }
+        guard !lost.isEmpty else { return }
+        // A guia em branco criada no lugar da lista perdida dá lugar às recuperadas.
+        let placeholder = store.startedFresh && sessions.count == 1 ? sessions.first : nil
+        for (i, id) in lost.enumerated() {
+            sessions.append(makeSession(store.add(name: lost.count > 1 ? "Recuperada \(i + 1)" : "Recuperada", id: id)))
+        }
+        Log.write("\(lost.count) sessão(ões) sem guia recuperada(s) como guia")
+        if let placeholder { remove(placeholder) } else { layoutSessions() }
+        onAccountsChange?()
     }
 
     private func selectTab(_ id: UUID) {

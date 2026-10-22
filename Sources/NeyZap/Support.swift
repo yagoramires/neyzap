@@ -27,10 +27,31 @@ enum AppPaths {
         return dir
     }()
 
+    /// Pasta de depuração: só o usuário entra (pode guardar a senha do canal e dumps).
     static var debug: URL {
         let dir = support.appendingPathComponent("debug", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
         return dir
+    }
+
+    /// Grava em debug/ um arquivo que só o usuário lê (criado já 0600, sem janela 0644).
+    @discardableResult
+    static func writePrivate(_ data: Data, to name: String) -> URL? {
+        let url = debug.appendingPathComponent(name)
+        let temp = debug.appendingPathComponent(".\(name).\(UUID().uuidString)")
+        guard FileManager.default.createFile(atPath: temp.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return nil }
+        guard rename(temp.path, url.path) == 0 else {
+            try? FileManager.default.removeItem(at: temp)
+            return nil
+        }
+        return url
+    }
+
+    /// Nome de guia seguro para nome de arquivo (sem "/" nem "..").
+    static func safeName(_ name: String) -> String {
+        let cleaned = name.map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "_" }
+        return String(cleaned.prefix(40))
     }
 
     /// Caminho livre em ~/Downloads (acrescenta " 2", " 3"… se já existir).

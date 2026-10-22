@@ -35,7 +35,7 @@ EOF
 # OpenSSL do sistema (LibreSSL): o OpenSSL 3 do Homebrew gera um .p12 que o
 # `security import` costuma recusar.
 OPENSSL=/usr/bin/openssl
-export PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+export PASS="$($OPENSSL rand -base64 18)"
 $OPENSSL req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout "$TMP/key.pem" -out "$TMP/cert.pem" -config "$TMP/cert.cnf" 2>/dev/null
 $OPENSSL pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" \

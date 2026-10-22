@@ -149,11 +149,6 @@ final class AccountSession: NSObject {
         typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
         unsafeBitCast(preferences.method(for: selector), to: Setter.self)(preferences, selector, value)
     }
-
-    private static func isWhatsApp(_ host: String?) -> Bool {
-        guard let host = host?.lowercased() else { return false }
-        return ["whatsapp.com", "whatsapp.net"].contains { host == $0 || host.hasSuffix("." + $0) }
-    }
 }
 
 // MARK: - Mensagens do JS
@@ -163,10 +158,11 @@ extension AccountSession: WKScriptMessageHandler {
         // Só o próprio script, no quadro principal do WhatsApp Web (não iframes de prévias).
         guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == "web.whatsapp.com",
               let raw = message.body as? [String: Any], let type = raw["type"] as? String else { return }
-        let body = raw.mapValues { value -> Any in
-            guard let text = value as? String else { return value }
+        var body: [String: Any] = [:]
+        for (key, value) in raw {
+            guard let text = value as? String else { body[key] = value; continue }
             // Texto de notificação e de log tem tamanho limitado; a foto (data URL) pode ser maior.
-            return String(text.prefix(text.hasPrefix("data:image/") ? 3_000_000 : 2_000))
+            body[key] = String(text.prefix(key == "icon" && text.hasPrefix("data:") ? 3_000_000 : 2_000))
         }
         switch type {
         case "notify":
@@ -199,6 +195,8 @@ extension AccountSession: WKScriptMessageHandler {
         case "bgsync":
             // Tentativa registrada mesmo sem sucesso: a próxima só amanhã (sem loop).
             UserDefaults.standard.set(Date(), forKey: "bgSyncCheckedAt-\(accountID.uuidString)")
+            // A data entra no script das próximas cargas (⌘R, atualização do WhatsApp).
+            installUserScripts(userCSS: UserStyle.shared.css)
             Log.write((body["ok"] as? Bool ?? false)
                 ? "[\(name)] sincronização em segundo plano conferida (ligada)"
                 : "[\(name)] não achei a opção de sincronização em segundo plano; tento de novo amanhã")

@@ -14,9 +14,10 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// Pede permissão à Central de Notificações (só no modo "notificações do sistema").
-    func requestPermission() {
+    func requestPermission(completion: @escaping (Bool) -> Void) {
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if let error { Log.write("notificações do sistema não autorizadas: \(error.localizedDescription)") }
+            DispatchQueue.main.async { completion(granted) }
         }
     }
 
