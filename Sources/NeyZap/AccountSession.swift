@@ -122,7 +122,8 @@ final class AccountSession: NSObject {
         controller.removeAllUserScripts()
         // Depuração: abre o WhatsApp Web puro, sem nada injetado.
         if UserDefaults.standard.bool(forKey: "debugNoInject") { return }
-        let config = "window.__neyzapConfig = { baseCSS: \(jsLiteral(Self.baseCSS)), userCSS: \(jsLiteral(userCSS)), compactWidth: 760 };"
+        let bgSyncCheckedAt = Int((UserDefaults.standard.object(forKey: "bgSyncCheckedAt-\(accountID.uuidString)") as? Date)?.timeIntervalSince1970 ?? 0) * 1000
+        let config = "window.__neyzapConfig = { baseCSS: \(jsLiteral(Self.baseCSS)), userCSS: \(jsLiteral(userCSS)), compactWidth: 760, bgSyncCheckedAt: \(bgSyncCheckedAt) };"
         controller.addUserScript(WKUserScript(source: config, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         controller.addUserScript(WKUserScript(source: Self.injectJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
@@ -186,6 +187,9 @@ extension AccountSession: WKScriptMessageHandler {
                 tag: tag,
                 silent: body["silent"] as? Bool ?? false
             )
+        case "bgsync":
+            UserDefaults.standard.set(Date(), forKey: "bgSyncCheckedAt-\(accountID.uuidString)")
+            Log.write("[\(name)] sincronização em segundo plano conferida (ligada)")
         case "log":
             Log.write("[\(name)] \(body["message"] as? String ?? "")")
         case "archived":
