@@ -206,6 +206,18 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         hovering = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
     }
 
+    /// A guia fica na barra de título: se ela contasse como área de arrastar a janela,
+    /// o duplo clique para renomear também daria zoom na janela.
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    /// Inicial, nome e selos não recebem cliques: tudo cai na guia (só o × e o campo
+    /// sendo editado ficam com os seus).
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        if editingOriginal != nil || hit === closeButton || hit.isDescendant(of: closeButton) { return hit }
+        return self
+    }
+
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
             beginEditing()
