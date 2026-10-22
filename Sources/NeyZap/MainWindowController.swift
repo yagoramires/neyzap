@@ -148,19 +148,30 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         refreshToolbar()
     }
 
-    /// Contas fora da tela ficam na janela, ocultas, com o tamanho real. Fora da
-    /// hierarquia a página fica 0×0, e o WhatsApp pode travar carregando assim.
+    /// Janela invisível (nunca mostrada, nunca em foco) onde ficam as contas fora
+    /// da tela. Para o WebKit elas viram uma aba de fundo de outra janela: ocultas e
+    /// sem foco, então o WhatsApp notifica e não marca nada como lido. E mantêm o
+    /// tamanho real (fora de qualquer janela a página fica 0×0 e pode travar).
+    private lazy var parkingWindow: NSWindow = {
+        let parking = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+                               styleMask: [.borderless], backing: .buffered, defer: false)
+        parking.isReleasedWhenClosed = false
+        parking.contentView = NSView()
+        return parking
+    }()
+
     private func parkHiddenSessions(except visible: [AccountSession]) {
-        guard let content = window?.contentView else { return }
+        guard let parked = parkingWindow.contentView else { return }
+        parkingWindow.setContentSize(splitView.frame.size)
         for session in sessions where !visible.contains(where: { $0 === session }) {
             let webView = session.webView
-            if webView.superview !== content {
+            if webView.superview !== parked {
                 webView.removeFromSuperview()
-                content.addSubview(webView, positioned: .below, relativeTo: splitView)
+                parked.addSubview(webView)
             }
-            webView.frame = splitView.frame
+            webView.frame = parked.bounds
             webView.autoresizingMask = [.width, .height]
-            webView.isHidden = true
+            webView.isHidden = false
         }
         for session in visible { session.webView.isHidden = false }
     }
