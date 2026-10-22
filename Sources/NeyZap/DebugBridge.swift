@@ -78,6 +78,14 @@ final class DebugBridge {
             windowController.sessions.forEach { $0.reloadResources(jsChanged: jsChanged) }
         case "side":
             windowController.isSideBySide = parts.count > 1 && parts[1] == "on"
+        case "evalin":
+            // evalin <conta> <expr>: como eval, mas numa conta específica (sem trocar de aba).
+            guard parts.count > 2, let session = windowController.sessions.first(where: { $0.name == parts[1] }) else { return }
+            let js = parts.dropFirst(2).joined(separator: " ")
+            session.webView.evaluateJavaScript("JSON.stringify((() => { return \(js) })())") { result, error in
+                let text = (result as? String) ?? "erro: \(String(describing: error))"
+                try? text.write(to: self.file("eval.txt"), atomically: true, encoding: .utf8)
+            }
         case "select":
             guard parts.count > 1, let i = windowController.sessions.firstIndex(where: { $0.name == parts[1] }) else { return }
             windowController.select(index: i)

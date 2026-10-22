@@ -41,6 +41,12 @@ final class AccountSession: NSObject {
         config.applicationNameForUserAgent = "Version/\(Self.safariVersion) Safari/605.1.15"
         config.mediaTypesRequiringUserActionForPlayback = []
         config.preferences.isElementFullscreenEnabled = true
+        // Contas independentes: a aba escondida (ou a janela fechada) continua
+        // rodando a todo vapor, senão o WebKit congela a página e as mensagens só
+        // chegam (e notificam) quando a aba volta para a tela.
+        Self.setPrivatePreference(config.preferences, "_setPageVisibilityBasedProcessSuppressionEnabled:", false)
+        Self.setPrivatePreference(config.preferences, "_setHiddenPageDOMTimerThrottlingEnabled:", false)
+        Self.setPrivatePreference(config.preferences, "_setHiddenPageDOMTimerThrottlingAutoIncreases:", false)
         webView = WKWebView(frame: .zero, configuration: config)
 
         super.init()
@@ -128,6 +134,17 @@ final class AccountSession: NSObject {
             return
         }
         unread = Int(title[title.index(after: title.startIndex)..<close]) ?? 0
+    }
+
+    /// Ajustes privados do WKPreferences (sem eles na versão do WebKit, só registra no log).
+    private static func setPrivatePreference(_ preferences: WKPreferences, _ name: String, _ value: Bool) {
+        let selector = NSSelectorFromString(name)
+        guard preferences.responds(to: selector) else {
+            Log.write("WebKit sem \(name)")
+            return
+        }
+        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(preferences.method(for: selector), to: Setter.self)(preferences, selector, value)
     }
 
     private static func isWhatsApp(_ host: String?) -> Bool {
