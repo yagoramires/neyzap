@@ -1,0 +1,203 @@
+/*
+ * NeyZap — CSS base (layout responsivo). O tema visual fica no user.css, que é
+ * carregado depois deste arquivo e recarregado ao salvar.
+ *
+ * Atributos marcados pelo inject.js:
+ *   html[data-nz-compact]           janela estreita (< 760 px): uma coluna por vez
+ *   html[data-nz-view=list|chat]    coluna visível no modo compacto
+ *   html[data-nz-drawer]            painel da direita aberto (dados do contato, busca…)
+ *   html[data-nz-drawer-over]       …e sobreposto à conversa (larguras médias)
+ *   [data-nz=panes]                 container das colunas
+ *   [data-nz=left|side|main|drawer] trilho, lista, conversa, painel da direita
+ *   [data-nz=overlay]               camadas absolutas (popups, avisos, painéis)
+ *   [data-nz-sub=side|rest]         colunas da camada dos painéis da esquerda
+ *   [data-nz-anc]                   ancestrais do container
+ *
+ * Larguras: < 400 mínimo · < 560 estreito · < 760 compacto · ≥ 760 colunas.
+ * As media queries valem por conta (no lado a lado, cada conta tem a sua largura).
+ */
+
+/* Sem barras de rolagem visíveis (a rolagem continua normal). */
+* {
+  scrollbar-width: none !important;
+}
+
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ---------- Coisas removidas ---------- */
+
+/* Meta AI (botão no trilho e onde mais aparecer) e a divisória que sobraria. */
+button[aria-label="Meta AI"],
+[data-nz="left"] div:has(> span button[aria-label="Meta AI"]),
+[data-nz="left"] hr:has(+ div:last-child button[aria-label="Meta AI"]) {
+  display: none !important;
+}
+
+/* Propaganda do app para Mac/Windows (marcada pelo inject.js). */
+[data-nz-hide] {
+  display: none !important;
+}
+
+/* Deixa a janela encolher além do mínimo que o WhatsApp Web impõe. */
+html, body, #app, [data-nz-anc], [data-nz="panes"], [data-nz="side"], [data-nz="main"] {
+  min-width: 0 !important;
+}
+
+/* Em telas largas a lista para de crescer; a conversa fica com o resto. */
+[data-nz="side"],
+[data-nz-sub="side"] {
+  max-width: min(40%, 520px) !important;
+}
+
+/* Larguras médias: o painel da direita sobreposto cobre a conversa inteira em vez
+   de deixar uma faixa dela aparecendo. */
+html[data-nz-drawer-over] [data-testid="drawer-right"] {
+  left: var(--nz-main-left, auto) !important;
+  right: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+}
+
+/* ---------- Modo compacto: uma coluna por vez ---------- */
+
+html[data-nz-compact] [data-nz="side"],
+html[data-nz-compact] [data-nz="main"],
+html[data-nz-compact][data-nz-view="list"] [data-nz-sub="side"],
+html[data-nz-compact][data-nz-view="chat"] [data-nz-sub="rest"] {
+  flex: 1 1 100% !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+/* A coluna escondida sai da tela em vez de usar display:none, para continuar
+   focável (é o foco que troca a coluna visível). */
+html[data-nz-compact][data-nz-view="list"] [data-nz="main"],
+html[data-nz-compact][data-nz-view="list"] [data-nz="drawer"],
+html[data-nz-compact]:not([data-nz-drawer]) [data-nz="drawer"],
+html[data-nz-compact][data-nz-view="chat"] [data-nz="side"],
+html[data-nz-compact][data-nz-view="chat"] [data-nz="left"] {
+  position: fixed !important;
+  left: -200vw !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  pointer-events: none !important;
+}
+
+/* Painel da direita aberto: ocupa a tela toda por cima da conversa. */
+html[data-nz-compact][data-nz-view="chat"][data-nz-drawer] [data-nz="drawer"] {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 300 !important; /* a coluna da conversa já usa 100 */
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+/* Camada dos painéis: a 1ª coluna (Configurações, Nova conversa…) acompanha a
+   lista; a 2ª cobre a área da conversa e é onde abrem a prévia de mídia colada/
+   anexada e afins. No modo compacto só a coluna da vista atual tem largura.
+   (As duas são pointer-events:none no WhatsApp; só o conteúdo recebe cliques.) */
+html[data-nz-compact][data-nz-view="list"] [data-nz-sub="rest"],
+html[data-nz-compact][data-nz-view="chat"] [data-nz-sub="side"] {
+  flex: 0 0 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+}
+
+/* A 1ª coluna reserva 64 px à esquerda para o trilho, que some com a conversa
+   aberta; sem isso a prévia de mídia ficaria deslocada. */
+html[data-nz-compact][data-nz-view="chat"] [data-nz-sub="side"] {
+  margin: 0 !important;
+}
+
+/* Sem as divisórias das colunas que não existem no modo compacto. */
+html[data-nz-compact] [data-nz-sub] {
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+}
+
+html[data-nz-compact][data-nz-view="chat"] #main header {
+  padding-left: 46px !important;
+}
+
+/* Painel de emojis/GIFs/figurinhas: o WhatsApp centraliza os 560 px dele no botão,
+   que no modo compacto fica colado na borda, e a grade tem 12 colunas fixas (numa
+   largura menor, parte dos emojis quebraria para uma linha escondida). Então ele
+   encosta na esquerda e encolhe por inteiro (--nz-expr-zoom, calculado no JS). */
+html[data-nz-compact] #expressions-panel-container [role="application"] {
+  zoom: var(--nz-expr-zoom, 1) !important;
+  left: calc(8px / var(--nz-expr-zoom, 1)) !important;
+  bottom: calc(78px / var(--nz-expr-zoom, 1)) !important;
+}
+
+/* ---------- Cabeçalho da conversa em larguras pequenas ---------- */
+
+@media (max-width: 559px) {
+  /* Etiquetas e a setinha do menu de ligação dão lugar ao nome do contato. */
+  #main header span:has([data-testid="label-chat-header-button"]) {
+    display: none !important;
+  }
+  #main header button:is([aria-label="Ligação de vídeo"], [aria-label="Video call"]) > div > div > div:not(:first-child) {
+    display: none !important;
+  }
+  #main header button:is([aria-label="Ligação de vídeo"], [aria-label="Video call"]) {
+    min-width: 0 !important;
+  }
+}
+
+/* ---------- Mensagens em larguras pequenas ---------- */
+
+@media (max-width: 559px) {
+  /* As linhas de mensagem têm ~60 px de respiro de cada lado e os balões de mídia
+     têm 336 px fixos: numa coluna estreita eles saem da tela. */
+  #main :has(> [data-testid="msg-container"]) {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  #main [data-testid="msg-container"] {
+    max-width: 88% !important;
+  }
+}
+
+@media (max-width: 399px) {
+  #main header button:is([aria-label="Ligação de vídeo"], [aria-label="Video call"]) {
+    display: none !important;
+  }
+}
+
+/* ---------- Botão de voltar ---------- */
+
+#nz-back {
+  position: fixed;
+  left: 8px;
+  top: 12px;
+  z-index: 1000;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--icon, currentColor);
+  cursor: pointer;
+}
+
+#nz-back[hidden] {
+  display: none;
+}
+
+#nz-back:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
