@@ -5,8 +5,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     private(set) var sessions: [AccountSession] = []
     private(set) var selectedIndex = 0
     var onUnreadChange: (() -> Void)?
+    /// Guias criadas, renomeadas ou fechadas (para atualizar menus).
+    var onAccountsChange: (() -> Void)?
 
-    private let accountPicker = NSSegmentedControl()
+    private let tabBar = TabBarView()
     private let splitView = NSSplitView()
     private let defaults = UserDefaults.standard
 
@@ -55,10 +57,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         window.contentView?.addSubview(splitView)
         splitView.frame = window.contentView!.bounds
 
-        accountPicker.segmentStyle = .automatic
-        accountPicker.trackingMode = .selectOne
-        accountPicker.target = self
-        accountPicker.action = #selector(pickAccount(_:))
+        tabBar.onSelect = { [weak self] id in self?.selectTab(id) }
+        tabBar.onAdd = { [weak self] in self?.newTab() }
+        tabBar.onRename = { [weak self] id, name in self?.rename(accountID: id, to: name) }
+        tabBar.onClose = { [weak self] id in self?.confirmClose(accountID: id) }
+        tabBar.onResetSession = { [weak self] id in self?.confirmReset(accountID: id) }
 
         let toolbar = NSToolbar(identifier: "main")
         toolbar.delegate = self
@@ -96,34 +99,80 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         if let i = sessions.firstIndex(where: { $0.accountID == accountID }) { select(index: i) }
     }
 
-    func addAccount(named name: String) {
-        sessions.append(makeSession(AccountStore.shared.add(name: name)))
+    /// Guia nova: conecta outro número (mostra o QR); o nome dá para trocar depois.
+    func newTab() {
+        let taken = Set(sessions.map(\.name))
+        var n = sessions.count + 1
+        while taken.contains("WhatsApp \(n)") { n += 1 }
+        sessions.append(makeSession(AccountStore.shared.add(name: "WhatsApp \(n)")))
         select(index: sessions.count - 1)
+        onAccountsChange?()
     }
 
-    func renameActiveAccount(to name: String) {
-        let session = activeSession
+    func rename(accountID: UUID, to name: String) {
+        guard let session = sessions.first(where: { $0.accountID == accountID }) else { return }
         session.name = name
-        AccountStore.shared.rename(session.accountID, to: name)
+        AccountStore.shared.rename(accountID, to: name)
         refreshPicker()
+        onAccountsChange?()
     }
 
-    /// Remove a conta e apaga a sessão dela (o WhatsApp vai pedir o QR de novo se ela for recriada).
-    func removeActiveAccount() {
-        guard sessions.count > 1 else { return }
-        let session = activeSession
-        let id = session.accountID
+    func promptRename(accountID: UUID) {
+        guard let session = sessions.first(where: { $0.accountID == accountID }),
+              let name = Dialogs.prompt(title: "Renomear guia", defaultValue: session.name, confirm: "Renomear") else { return }
+        rename(accountID: accountID, to: name)
+    }
+
+    /// Fecha a guia e apaga a sessão dela deste Mac (o número precisa ler o QR de novo).
+    func confirmClose(accountID: UUID) {
+        guard sessions.count > 1, let session = sessions.first(where: { $0.accountID == accountID }) else { return }
+        let ok = Dialogs.confirm(
+            title: "Fechar a guia “\(session.name)”?",
+            message: "A sessão do WhatsApp Web desta guia será apagada deste Mac. Lembre de desconectar o aparelho também no celular (Aparelhos conectados).",
+            confirm: "Fechar guia",
+            destructive: true
+        )
+        if ok { remove(accountID: accountID) }
+    }
+
+    func confirmReset(accountID: UUID) {
+        guard let session = sessions.first(where: { $0.accountID == accountID }) else { return }
+        let ok = Dialogs.confirm(
+            title: "Limpar a sessão de “\(session.name)”?",
+            message: "Os dados do WhatsApp Web desta guia serão apagados deste Mac e o QR code aparecerá de novo. Desconecte o aparelho antigo no celular (Aparelhos conectados).",
+            confirm: "Limpar",
+            destructive: true
+        )
+        if ok { session.resetSession() }
+    }
+
+    private func remove(accountID id: UUID) {
+        guard sessions.count > 1, let session = sessions.first(where: { $0.accountID == id }) else { return }
+        let wasSelected = session === selectedSession
         session.webView.removeFromSuperview()
         sessions.removeAll { $0 === session }
         AccountStore.shared.remove(id)
-        selectedIndex = min(selectedIndex, sessions.count - 1)
+        if wasSelected || selectedIndex >= sessions.count { selectedIndex = min(selectedIndex, sessions.count - 1) }
+        defaults.set(selectedIndex, forKey: "selectedAccount")
         layoutSessions()
         onUnreadChange?()
+        onAccountsChange?()
         // Dá tempo da WebView ser liberada antes de apagar o armazenamento.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             WKWebsiteDataStore.remove(forIdentifier: id) { error in
-                if let error { NSLog("NeyZap: não consegui apagar os dados da conta: %@", error.localizedDescription) }
+                if let error { Log.write("não consegui apagar os dados da guia: \(error.localizedDescription)") }
             }
+        }
+    }
+
+    private func selectTab(_ id: UUID) {
+        guard let i = sessions.firstIndex(where: { $0.accountID == id }) else { return }
+        if isSideBySide {
+            selectedIndex = i
+            window?.makeFirstResponder(selectedSession.webView)
+            refreshPicker()
+        } else {
+            select(index: i)
         }
     }
 
@@ -209,12 +258,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     // MARK: - Barra de ferramentas
 
-    private static let pickerItem = NSToolbarItem.Identifier("accounts")
+    private static let tabsItem = NSToolbarItem.Identifier("tabs")
     private static let sideBySideItem = NSToolbarItem.Identifier("sideBySide")
     private static let pinItem = NSToolbarItem.Identifier("pin")
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Self.pickerItem, .flexibleSpace, Self.sideBySideItem, Self.pinItem]
+        [Self.tabsItem, .flexibleSpace, Self.sideBySideItem, Self.pinItem]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -224,9 +273,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: id)
         switch id {
-        case Self.pickerItem:
-            item.view = accountPicker
-            item.label = "Contas"
+        case Self.tabsItem:
+            item.view = tabBar
+            item.label = "Guias"
+            item.visibilityPriority = .high
         case Self.sideBySideItem:
             item.label = "Lado a lado"
             item.toolTip = "Mostrar as contas lado a lado (⌘\\)"
@@ -246,71 +296,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     }
 
     private func refreshPicker() {
-        accountPicker.segmentCount = sessions.count
-        for (i, session) in sessions.enumerated() {
-            accountPicker.setLabel("", forSegment: i)
-            accountPicker.setImage(Self.tabImage(name: session.name, unread: session.unread, archived: session.archivedUnread), forSegment: i)
-            var tip = session.name
-            if session.unread > 0 { tip += " · \(session.unread) não lida(s)" }
-            if session.archivedUnread > 0 { tip += " · \(session.archivedUnread) arquivada(s)" }
-            accountPicker.setToolTip(tip, forSegment: i)
-            accountPicker.setWidth(0, forSegment: i)
-        }
-        accountPicker.selectedSegment = selectedIndex
-        accountPicker.sizeToFit()
-    }
-
-    /// Nome da conta + selo vermelho (não lidas) + selo cinza com ícone de arquivo
-    /// (arquivadas não lidas). Desenhado na hora de pintar, então a cor do texto
-    /// acompanha o tema claro/escuro.
-    private static func tabImage(name: String, unread: Int, archived: Int) -> NSImage {
-        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .medium)
-        let text = NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
-        let textSize = text.size()
-        let badgeHeight: CGFloat = 16
-        let gap: CGFloat = 5
-        let badgeFont = NSFont.systemFont(ofSize: 10.5, weight: .bold)
-
-        struct Badge { let label: NSAttributedString; let icon: NSImage?; let color: NSColor; let width: CGFloat }
-        func badge(_ count: Int, color: NSColor, symbol: String? = nil) -> Badge {
-            let label = NSAttributedString(string: count > 99 ? "99+" : "\(count)", attributes: [.font: badgeFont, .foregroundColor: NSColor.white])
-            let icon = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 8.5, weight: .bold)) }
-            let iconWidth = icon.map { $0.size.width + 3 } ?? 0
-            return Badge(label: label, icon: icon, color: color, width: max(badgeHeight, label.size().width + iconWidth + 9))
-        }
-        var badges: [Badge] = []
-        if unread > 0 { badges.append(badge(unread, color: .systemRed)) }
-        if archived > 0 { badges.append(badge(archived, color: .systemGray, symbol: "archivebox.fill")) }
-
-        let width = textSize.width + badges.reduce(0) { $0 + gap + $1.width }
-        let size = NSSize(width: ceil(width), height: max(ceil(textSize.height), badgeHeight))
-        let image = NSImage(size: size, flipped: false) { _ in
-            text.draw(at: NSPoint(x: 0, y: (size.height - textSize.height) / 2))
-            var x = textSize.width
-            for b in badges {
-                x += gap
-                let rect = NSRect(x: x, y: (size.height - badgeHeight) / 2, width: b.width, height: badgeHeight)
-                b.color.setFill()
-                NSBezierPath(roundedRect: rect, xRadius: badgeHeight / 2, yRadius: badgeHeight / 2).fill()
-                let labelSize = b.label.size()
-                var contentX = rect.midX - (labelSize.width + (b.icon.map { $0.size.width + 3 } ?? 0)) / 2
-                if let icon = b.icon {
-                    let tinted = NSImage(size: icon.size, flipped: false) { r in
-                        icon.draw(in: r)
-                        NSColor.white.set()
-                        r.fill(using: .sourceAtop)
-                        return true
-                    }
-                    tinted.draw(in: NSRect(x: contentX, y: rect.midY - icon.size.height / 2, width: icon.size.width, height: icon.size.height))
-                    contentX += icon.size.width + 3
-                }
-                b.label.draw(at: NSPoint(x: contentX, y: rect.midY - labelSize.height / 2))
-                x += b.width
-            }
-            return true
-        }
-        image.isTemplate = false
-        return image
+        let tabs = sessions.map { TabBarView.Tab(id: $0.accountID, name: $0.name, unread: $0.unread, archived: $0.archivedUnread) }
+        tabBar.update(tabs: tabs, selected: sessions.indices.contains(selectedIndex) ? selectedSession.accountID : nil)
     }
 
     private func refreshToolbar() {
@@ -327,15 +314,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     }
 
     // MARK: - Ações
-
-    @objc private func pickAccount(_ sender: NSSegmentedControl) {
-        if isSideBySide {
-            selectedIndex = sender.selectedSegment
-            window?.makeFirstResponder(selectedSession.webView)
-        } else {
-            select(index: sender.selectedSegment)
-        }
-    }
 
     @objc func toggleSideBySide(_ sender: Any?) { isSideBySide.toggle() }
     @objc func togglePinned(_ sender: Any?) { isPinned.toggle() }

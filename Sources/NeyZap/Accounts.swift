@@ -19,7 +19,7 @@ final class AccountStore {
            !saved.isEmpty {
             accounts = saved
         } else {
-            accounts = [Account(id: UUID(), name: "Pessoal"), Account(id: UUID(), name: "Trabalho")]
+            accounts = [Account(id: UUID(), name: "WhatsApp")]
             save()
         }
     }
