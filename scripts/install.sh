@@ -7,11 +7,13 @@ RESTART=1
 [[ "${1:-}" == "--no-restart" ]] && RESTART=0
 cd "$(dirname "$0")/.."
 scripts/build.sh release
-if (( RESTART )); then
-  pkill -x NeyZap 2>/dev/null || true
-  while pgrep -x NeyZap >/dev/null; do sleep 0.2; done
-fi
-rm -rf /Applications/NeyZap.app
-cp -R build/NeyZap.app /Applications/
-(( RESTART )) && open -n /Applications/NeyZap.app
+# Troca o app de uma vez: o novo entra com outro nome e só então substitui o antigo,
+# que vai para uma pasta temporária (um app aberto continua usando os arquivos dele).
+NEW=/Applications/.NeyZap-novo.app
+OLD="$(mktemp -d)/NeyZap.app"
+rm -rf "$NEW"
+cp -R build/NeyZap.app "$NEW"
+[[ -d /Applications/NeyZap.app ]] && mv /Applications/NeyZap.app "$OLD"
+mv "$NEW" /Applications/NeyZap.app
+(( RESTART )) && scripts/restart.sh /Applications/NeyZap.app
 echo "✓ instalado em /Applications/NeyZap.app"

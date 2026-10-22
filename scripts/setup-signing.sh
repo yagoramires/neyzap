@@ -32,11 +32,16 @@ keyUsage = critical, digitalSignature
 extendedKeyUsage = critical, codeSigning
 EOF
 
-openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+# OpenSSL do sistema (LibreSSL): o OpenSSL 3 do Homebrew gera um .p12 que o
+# `security import` costuma recusar.
+OPENSSL=/usr/bin/openssl
+export PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+$OPENSSL req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout "$TMP/key.pem" -out "$TMP/cert.pem" -config "$TMP/cert.cnf" 2>/dev/null
-openssl pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" \
-  -name "$NAME" -out "$TMP/id.p12" -passout pass:neyzap
+$OPENSSL pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" \
+  -name "$NAME" -out "$TMP/id.p12" -passout env:PASS
 
-# -T libera o uso da chave pelo codesign sem pedir senha a cada build.
-security import "$TMP/id.p12" -k "$KEYCHAIN" -P neyzap -T /usr/bin/codesign >/dev/null
+# -T libera o uso da chave pelo codesign sem pedir senha a cada build;
+# -x deixa a chave privada não exportável.
+security import "$TMP/id.p12" -k "$KEYCHAIN" -P "$PASS" -x -T /usr/bin/codesign >/dev/null
 echo "✓ certificado \"$NAME\" criado no Chaveiro de login"

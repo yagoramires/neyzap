@@ -31,6 +31,11 @@ final class BannerCenter {
         }
     }
 
+    /// Some com todos os balões de uma guia (guia fechada ou página recarregada).
+    func dismissAll(accountID: UUID) {
+        banners.filter { $0.content.accountID == accountID }.forEach { dismiss($0) }
+    }
+
     func dismiss(accountID: UUID, jsID: String) {
         banners.filter { $0.content.accountID == accountID && $0.content.jsID == jsID }.forEach { dismiss($0) }
     }
@@ -93,10 +98,10 @@ final class BannerCenter {
             let target = frame(at: i)
             if banner.frame.origin.y == target.origin.y { continue }
             if animated {
-                NSAnimationContext.runAnimationGroup { context in
+                NSAnimationContext.runAnimationGroup({ context in
                     context.duration = 0.2
                     banner.animator().setFrame(target, display: true)
-                }
+                }, completionHandler: { banner.refreshHoverFromMouse() })
             } else {
                 banner.setFrame(target, display: true)
             }
@@ -118,7 +123,8 @@ final class BannerCenter {
             completion(data.flatMap(NSImage.init(data:)))
             return
         }
-        guard let url = URL(string: source), url.scheme == "https" else {
+        guard let url = URL(string: source), url.scheme == "https",
+              let host = url.host?.lowercased(), ["whatsapp.net", "whatsapp.com"].contains(where: { host == $0 || host.hasSuffix("." + $0) }) else {
             completion(nil)
             return
         }
@@ -179,7 +185,7 @@ final class BannerPanel: NSPanel {
 
     func update(_ content: BannerContent, avatar: NSImage?) {
         self.content = content
-        avatarView.image = avatar
+        if let avatar { avatarView.image = avatar } // sem foto nova, mantém a que já estava
         avatarView.fallbackText = content.title
         accountLabel.stringValue = content.account ?? ""
         accountLabel.isHidden = content.account == nil
@@ -188,8 +194,12 @@ final class BannerPanel: NSPanel {
         startTimer()
     }
 
+    /// Com o mouse em cima o balão não some (o tempo volta a correr quando o mouse sai).
+    private(set) var hovering = false
+
     func startTimer() {
         timer?.invalidate()
+        guard !hovering else { return }
         timer = Timer.scheduledTimer(withTimeInterval: Self.lifetime, repeats: false) { [weak self] _ in self?.onExpire?() }
     }
 
@@ -198,14 +208,24 @@ final class BannerPanel: NSPanel {
         timer = nil
     }
 
+    func setHovering(_ inside: Bool) {
+        guard inside != hovering else { return }
+        hovering = inside
+        closeButton.isHidden = !inside
+        if inside { stopTimer() } else { startTimer() }
+    }
+
+    /// Depois de mudar de posição (outro balão saiu da pilha), confere se ficou
+    /// embaixo do cursor — nesse caso o sistema não avisa a entrada do mouse.
+    func refreshHoverFromMouse() {
+        setHovering(frame.contains(NSEvent.mouseLocation))
+    }
+
     private func buildViews() {
         let size = BannerCenter.size
         let m = Self.margin
         let container = BannerContainerView(frame: NSRect(x: 0, y: 0, width: size.width + m * 2, height: size.height + m * 2))
-        container.onHover = { [weak self] inside in
-            self?.closeButton.isHidden = !inside
-            if inside { self?.stopTimer() } else { self?.startTimer() }
-        }
+        container.onHover = { [weak self] inside in self?.setHovering(inside) }
         contentView = container
 
         let root = BannerRootView(frame: NSRect(x: m, y: m, width: size.width, height: size.height))
@@ -341,16 +361,7 @@ private final class CloseCircleView: NSView {
 /// Fundo translúcido que trata clique e hover do balão inteiro.
 private final class BannerRootView: NSVisualEffectView {
     var onClick: (() -> Void)?
-    var onHover: ((Bool) -> Void)?
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self))
-    }
-
-    override func mouseEntered(with event: NSEvent) { onHover?(true) }
-    override func mouseExited(with event: NSEvent) { onHover?(false) }
     override func mouseDown(with event: NSEvent) {}
     override func mouseUp(with event: NSEvent) {
         if bounds.contains(convert(event.locationInWindow, from: nil)) { onClick?() }

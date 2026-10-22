@@ -15,6 +15,10 @@ final class TabBarView: NSView {
     var onRename: ((UUID, String) -> Void)?
     var onClose: ((UUID) -> Void)?
     var onResetSession: ((UUID) -> Void)?
+    /// Terminou de renomear (para devolver o foco ao WhatsApp).
+    var onEditingEnded: (() -> Void)?
+    /// Largura máxima (a janela informa ao mudar de tamanho): acima disso os nomes encolhem.
+    var maxWidth: CGFloat = .greatestFiniteMagnitude { didSet { invalidateIntrinsicContentSize() } }
 
     private let stack = NSStackView()
     private let addButton = NSButton()
@@ -65,6 +69,7 @@ final class TabBarView: NSView {
                 item.onClose = { [weak self] in self?.onClose?(tab.id) }
                 item.onRename = { [weak self] name in self?.onRename?(tab.id, name) }
                 item.onResetSession = { [weak self] in self?.onResetSession?(tab.id) }
+                item.onEditingEnded = { [weak self] in self?.onEditingEnded?() }
                 stack.addArrangedSubview(item)
                 return item
             }
@@ -74,17 +79,13 @@ final class TabBarView: NSView {
             item.tab = tab
             item.isSelected = tab.id == selected
             item.canClose = tabs.count > 1
+            item.refreshHoverFromMouse()
         }
         invalidateIntrinsicContentSize()
     }
 
-    /// Começa a renomear a guia (usado ao criar uma nova).
-    func beginRename(_ id: UUID) {
-        items.first { $0.tab.id == id }?.beginEditing()
-    }
-
     override var intrinsicContentSize: NSSize {
-        NSSize(width: stack.fittingSize.width, height: 28)
+        NSSize(width: min(stack.fittingSize.width, maxWidth), height: 28)
     }
 
     @objc private func addTapped() { onAdd?() }
@@ -100,6 +101,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
     var onClose: (() -> Void)?
     var onRename: ((String) -> Void)?
     var onResetSession: (() -> Void)?
+    var onEditingEnded: (() -> Void)?
 
     private let avatar = InitialBadgeView()
     private let label = NSTextField(labelWithString: "")
@@ -121,6 +123,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         label.delegate = self
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         label.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
+        label.widthAnchor.constraint(greaterThanOrEqualToConstant: 0).isActive = true
 
         closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Fechar guia")
         closeButton.symbolConfiguration = .init(pointSize: 9, weight: .bold)
@@ -192,6 +195,13 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
     override func mouseEntered(with event: NSEvent) { hovering = true }
     override func mouseExited(with event: NSEvent) { hovering = false }
 
+    /// Depois de um aviso modal (confirmar fechamento) ou de uma guia sumir, o sistema
+    /// não avisa a saída do mouse: confere a posição real.
+    func refreshHoverFromMouse() {
+        guard let window else { hovering = false; return }
+        hovering = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
+    }
+
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
             beginEditing()
@@ -201,13 +211,14 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        onSelect?()
+        // Não seleciona a guia: trazê-la para a tela marcaria as mensagens como lidas.
         let menu = NSMenu()
         menu.addItem(withTitle: "Renomear guia", action: #selector(renameFromMenu), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Limpar sessão (novo QR code)…", action: #selector(resetFromMenu), keyEquivalent: "").target = self
         menu.addItem(.separator())
         let close = menu.addItem(withTitle: "Fechar guia…", action: canClose ? #selector(closeTapped) : nil, keyEquivalent: "")
         close.target = self
+        menu.items.forEach { $0.target = self }
         return menu
     }
 
@@ -237,7 +248,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         } else {
             label.stringValue = original
         }
-        window?.makeFirstResponder(nil)
+        onEditingEnded?()
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
@@ -258,7 +269,10 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
 
     @objc private func renameFromMenu() { beginEditing() }
     @objc private func resetFromMenu() { onResetSession?() }
-    @objc private func closeTapped() { onClose?() }
+    @objc private func closeTapped() {
+        onClose?()
+        refreshHoverFromMouse()
+    }
 }
 
 // MARK: - Peças

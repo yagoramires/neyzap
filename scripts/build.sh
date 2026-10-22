@@ -24,14 +24,23 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/inject.js Resources/layout.css "$APP/Contents/Resources/"
 [[ -f Resources/AppIcon.icns ]] && cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 
-# Assina com o certificado local se existir (scripts/setup-signing.sh); senão, ad-hoc.
+# Assina com o certificado local (scripts/setup-signing.sh). Sem ele, a assinatura
+# ad-hoc muda a cada build: o macOS volta a pedir permissões (câmera, microfone,
+# notificações) e acesso ao Chaveiro. Só segue assim com ALLOW_ADHOC=1.
 IDENTITY="NeyZap Local Signing"
-security find-certificate -c "$IDENTITY" >/dev/null 2>&1 || IDENTITY="-"
-codesign --force --sign "$IDENTITY" --timestamp=none "$APP"
+if ! security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then
+  if [[ "${ALLOW_ADHOC:-0}" != 1 ]]; then
+    echo "✗ certificado \"$IDENTITY\" não encontrado. Rode scripts/setup-signing.sh (ou ALLOW_ADHOC=1 para assinar ad-hoc)." >&2
+    exit 1
+  fi
+  echo "⚠️  assinando ad-hoc (ALLOW_ADHOC=1): permissões e Chaveiro vão ser pedidos de novo" >&2
+  IDENTITY="-"
+fi
+# Runtime reforçado (bloqueia injeção de bibliotecas), com câmera e microfone liberados.
+codesign --force --sign "$IDENTITY" --timestamp=none --options runtime \
+  --entitlements Resources/NeyZap.entitlements "$APP"
 echo "✓ $APP"
 
 if (( RUN )); then
-  pkill -x NeyZap 2>/dev/null || true
-  while pgrep -x NeyZap >/dev/null; do sleep 0.2; done
-  open -n "$APP"
+  scripts/restart.sh "$APP"
 fi
