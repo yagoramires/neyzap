@@ -54,6 +54,12 @@ button[aria-label="Meta AI"],
   display: none !important;
 }
 
+/* Conta fora da tela: as mensagens da conversa aberta saem do layout, para o
+   WhatsApp não marcá-las como lidas (html[data-nz-hidden], marcado pelo inject.js). */
+html[data-nz-hidden] #main [data-testid="conversation-panel-messages"] {
+  display: none !important;
+}
+
 /* Deixa a janela encolher além do mínimo que o WhatsApp Web impõe. */
 html, body, #app, [data-nz-anc], [data-nz="panes"], [data-nz="side"], [data-nz="main"] {
   min-width: 0 !important;

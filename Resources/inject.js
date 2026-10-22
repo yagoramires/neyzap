@@ -447,6 +447,17 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Conta escondida (aba fora da tela ou janela fechada) não "lê" nada: o
+  // WhatsApp marca como lida a mensagem que aparece na conversa aberta, e a página
+  // escondida continua com o layout montado. Enquanto oculta, a área de mensagens
+  // sai do layout (CSS em html[data-nz-hidden]).
+  function applyHidden() {
+    if (document.visibilityState === 'visible') delete root.dataset.nzHidden;
+    else root.dataset.nzHidden = '';
+  }
+  document.addEventListener('visibilitychange', applyHidden);
+  applyHidden();
+
   function init() {
     setStyle('nz-base', cfg.baseCSS);
     setStyle('nz-user', cfg.userCSS);
