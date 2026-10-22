@@ -326,7 +326,24 @@
   // NeyZap, então ele só confunde. Os outros avisos dessa faixa continuam.
   const NOTIFICATIONS_OFF = /notifica[çc][õo]es de mensagens est[ãa]o desativadas|message notifications are off|turn on (desktop )?notifications/i;
 
+  // Título "WhatsApp" no topo da lista vira "NeyZap" (só o texto do cabeçalho,
+  // perto do topo; contatos e mensagens nunca são tocados).
+  function renameTitle() {
+    const side = document.querySelector('[data-nz="side"]');
+    if (!side) return;
+    const top = side.getBoundingClientRect().top;
+    const walker = document.createTreeWalker(side, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.data.trim();
+      if (text !== 'WhatsApp' && text !== 'WhatsApp Business') continue;
+      const el = n.parentElement;
+      if (!el || el.closest('#pane-side') || el.getBoundingClientRect().top - top > 80) continue;
+      n.data = n.data.replace(text, 'NeyZap');
+    }
+  }
+
   function hidePromos() {
+    renameTitle();
     const bar = document.querySelector('[data-testid="chat-butterbar"]');
     if (bar) {
       for (const child of bar.children) {

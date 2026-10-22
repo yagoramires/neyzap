@@ -37,6 +37,18 @@ button[aria-label="Meta AI"],
   display: none !important;
 }
 
+/* Título da lista: o logotipo "WhatsApp" vira "NeyZap". */
+[data-icon="wa-wordmark"] > svg {
+  display: none !important;
+}
+
+[data-icon="wa-wordmark"]::after {
+  content: "NeyZap";
+  font: 700 22px/28px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  letter-spacing: -0.3px;
+  color: currentColor;
+}
+
 /* Propaganda do app para Mac/Windows (marcada pelo inject.js). */
 [data-nz-hide] {
   display: none !important;

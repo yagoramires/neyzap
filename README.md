@@ -36,7 +36,7 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
   se ajustam à largura.
 - **Notificações com a foto do contato** — mostram a conta (ex.: *Pessoal*) em cima
   do nome, abrem a conversa no clique e não somem com o mouse em cima.
-- **Mais limpo** — sem Meta AI, sem propaganda do app oficial, sem aviso de
+- **Mais limpo** — título NeyZap, sem Meta AI, sem propaganda do app oficial, sem aviso de
   notificações e sem barras de rolagem.
 - **Integração com o Mac** — contador no Dock, atalho global **⌃⌥Z** para
   mostrar/esconder, *Sempre na frente* (⌥⌘T), abrir ao iniciar sessão, downloads
