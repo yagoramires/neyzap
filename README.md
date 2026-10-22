@@ -50,7 +50,8 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
   em `~/Downloads`. Fechar a janela (⌘W) não desliga: as mensagens continuam
   chegando.
 - **Sessões que ficam** — feche e abra o app à vontade, as contas continuam logadas.
-- **Atualizações** — o app avisa quando sai versão nova aqui no GitHub.
+- **Atualizações automáticas** — quando sai versão nova aqui no GitHub, o app baixa,
+  confere a assinatura e se instala; é só escolher reiniciar agora ou depois.
 - **Tema próprio** — `NeyZap → Editar tema` abre um CSS que aplica ao salvar.
 
 ## 📦 Instalação
@@ -94,7 +95,7 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
   nele, escolhendo "Marcar como lida" no menu da própria conversa.
 - Tudo fica no seu Mac: sessões em armazenamentos separados por conta, nada é
   enviado para servidores além do próprio WhatsApp. A verificação de atualização
-  só consulta a lista de versões deste repositório.
+  só consulta a lista de versões deste repositório e baixa o zip publicado aqui.
 - A chave que protege as sessões fica num arquivo que só o seu usuário lê
   (`~/Library/Application Support/NeyZap/webcrypto.key`), e não no Chaveiro: sem
   conta de desenvolvedor da Apple, o Chaveiro pediria a senha a cada atualização do
