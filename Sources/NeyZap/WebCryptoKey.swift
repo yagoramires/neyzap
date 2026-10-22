@@ -20,8 +20,9 @@ enum WebCryptoKey {
         if let saved = try? Data(contentsOf: url), saved.count >= 16 { return saved }
 
         if fm.fileExists(atPath: url.path) {
-            let bad = url.appendingPathExtension("corrompida")
-            try? fm.removeItem(at: bad)
+            // Com data no nome: uma segunda falha não apaga a cópia da primeira.
+            let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+            let bad = url.appendingPathExtension("corrompida-\(stamp)")
             try? fm.moveItem(at: url, to: bad)
             Log.write("chave do WebCrypto ilegível; guardada em \(bad.lastPathComponent)")
         }
@@ -40,12 +41,15 @@ enum WebCryptoKey {
         return key
     }()
 
+    /// Grava já com permissão 0600 (nunca existe uma cópia legível por outros) e troca
+    /// o arquivo de uma vez.
     private static func save(_ key: Data) {
-        do {
-            try key.write(to: url, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-        } catch {
-            Log.write("não consegui gravar a chave do WebCrypto: \(error.localizedDescription)")
+        let temp = url.deletingLastPathComponent().appendingPathComponent(".webcrypto.key.\(UUID().uuidString)")
+        guard FileManager.default.createFile(atPath: temp.path, contents: key, attributes: [.posixPermissions: 0o600]),
+              rename(temp.path, url.path) == 0 else {
+            try? FileManager.default.removeItem(at: temp)
+            Log.write("não consegui gravar a chave do WebCrypto")
+            return
         }
     }
 

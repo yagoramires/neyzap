@@ -42,7 +42,11 @@
       this.silent = !!options.silent;
       this.onclick = this.onclose = this.onshow = this.onerror = null;
       live.set(this.id, this);
-      if (live.size > 200) live.delete(live.keys().next().value); // as mais antigas saem
+      if (live.size > 200) { // as mais antigas saem (e o balão delas também)
+        const oldest = live.keys().next().value;
+        live.delete(oldest);
+        post({ type: 'notifyClose', id: oldest });
+      }
       const send = (icon) => post({ type: 'notify', id: this.id, title: this.title, body: this.body, tag: this.tag, silent: this.silent, icon });
       // A foto do contato costuma vir como blob:, que só esta página consegue ler:
       // vira data URL antes de ir para o app. URLs https o app baixa sozinho.
@@ -403,7 +407,8 @@
   // para na hora se a conta voltar para a tela. Só muda essa preferência local.
   const BG_SYNC = /sincroniza[çc][ãa]o em segundo plano|background sync/i;
   let bgSyncRunning = false;
-  let bgSyncDone = Date.now() - (cfg.bgSyncCheckedAt || 0) < 24 * 3600 * 1000;
+  let bgSyncLast = cfg.bgSyncCheckedAt || 0; // última tentativa (ms), dando certo ou não
+  const bgSyncDue = () => Date.now() - bgSyncLast >= 24 * 3600 * 1000;
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const hiddenNow = () => document.visibilityState !== 'visible';
   const railButton = (labels) => [...document.querySelectorAll('header button[aria-label], [data-nz="left"] button')]
@@ -434,12 +439,17 @@
   }
 
   async function ensureBackgroundSync() {
-    if (bgSyncDone || bgSyncRunning || !hiddenNow() || !document.getElementById('side')) return;
+    if (!bgSyncDue() || bgSyncRunning || !hiddenNow() || !document.getElementById('side')) return;
     bgSyncRunning = true;
-    bgSyncDone = true; // uma tentativa por dia, dando certo ou não (sem loop se a tela mudar)
+    bgSyncLast = Date.now(); // uma tentativa por dia, dando certo ou não (sem loop se a tela mudar)
     let opened = false;
     let enabled = false;
+    // No modo compacto com uma conversa aberta, a coluna das configurações tem
+    // largura zero e nada nela seria achado: mostra a lista enquanto isso.
+    const previousView = root.dataset.nzView;
+    setView('list');
     try {
+      tick();
       const settings = railButton(['Configurações', 'Settings']) || railButton(['Você', 'You']);
       if (!settings) return;
       settings.click();
@@ -454,7 +464,8 @@
       // O interruptor é o único dentro do menor bloco que contém o texto da opção.
       const label = findPanelText(BG_SYNC);
       let toggle = null;
-      for (let el = label; el && !toggle; el = el.parentElement) {
+      // Sobe pouco: num bloco grande demais o interruptor achado seria de outra opção.
+      for (let el = label, depth = 0; el && !toggle && depth < 6 && el.textContent.length <= 300; el = el.parentElement, depth++) {
         const switches = el.querySelectorAll('input[role="switch"], input[type="checkbox"]');
         if (switches.length === 1) toggle = switches[0];
         else if (switches.length > 1) break;
@@ -470,12 +481,13 @@
       bgSyncRunning = false;
       post({ type: 'bgsync', ok: enabled });
       if (opened) railButton(['Conversas', 'Chats'])?.click(); // volta às conversas só se abriu as configurações
+      if (previousView) setView(previousView);
     }
   }
 
   // Tarefas periódicas: cada uma isolada, para uma falha não derrubar as outras.
   function housekeeping() {
-    if (!bgSyncDone && !bgSyncRunning && hiddenNow()) ensureBackgroundSync().catch((e) => post({ type: 'log', message: `erro em ensureBackgroundSync: ${e}` }));
+    if (bgSyncDue() && !bgSyncRunning && hiddenNow()) ensureBackgroundSync().catch((e) => post({ type: 'log', message: `erro em ensureBackgroundSync: ${e}` }));
     for (const task of [enableNotifications, reportArchived, renameTitle, hidePromos]) {
       try { task(); } catch (e) { post({ type: 'log', message: `erro em ${task.name}: ${e}` }); }
     }
@@ -519,13 +531,46 @@
   const chatTitle = () => document.querySelector('#main header [data-testid="conversation-info-header-chat-title"]')?.textContent || null;
   document.addEventListener('click', (e) => {
     const t = e.target;
-    if (!(t instanceof Element) || !t.closest('#pane-side [role="row"], #pane-side [role="listitem"]')) return;
+    if (!(t instanceof Element) || !t.closest('#pane-side [role="row"], #pane-side [role="listitem"]')
+      || t.closest('[data-testid="chatlist-panel-archived-button"]')) return;
     const before = chatTitle();
+    const fromList = root.dataset.nzView === 'list';
     setTimeout(() => {
+      // Mesma conversa de novo (canal só de leitura, sem campo para focar) também volta para ela.
       const after = chatTitle();
-      if (after && after !== before) setView('chat');
+      if (after && (after !== before || fromList)) setView('chat');
     }, 400);
   }, true);
+
+  // Clique direito numa mensagem ou conversa: quando o WhatsApp não abre o menu dele
+  // (depende do navegador), o WebKit mostraria o menu genérico da página. Nesse caso
+  // abre o mesmo menu do WhatsApp pela setinha que ele mostra ao passar o mouse
+  // (Responder, Reagir, Copiar…). Só abre o menu; a escolha continua com o usuário.
+  // Links, campos de texto e texto selecionado mantêm o menu do sistema.
+  const MENU_ICON = '[data-icon*="down-context"], [data-icon*="chevron-down"], [data-icon="down"], [data-icon*="chevron_down"]';
+  const MENU_LABEL = /^(menu de contexto|context menu|mais opções|more options|abrir menu da conversa|open chat context menu)$/i;
+  let warnedNoMenu = false;
+  window.addEventListener('contextmenu', (e) => {
+    const t = e.target;
+    if (e.defaultPrevented || !e.isTrusted || !(t instanceof Element)) return;
+    if (t.closest('a[href], [contenteditable="true"], input, textarea') || String(getSelection()).trim()) return;
+    const host = t.closest('#main [data-id], #main [role="row"], #pane-side [role="row"], #pane-side [role="listitem"]');
+    if (!host) return;
+    const labeled = [...host.querySelectorAll('button[aria-label], [role="button"][aria-label]')]
+      .find((b) => MENU_LABEL.test(b.getAttribute('aria-label').trim()));
+    const icon = host.querySelector(MENU_ICON);
+    const button = labeled || (icon && (icon.closest('button, [role="button"]') || icon));
+    if (!button) {
+      if (!warnedNoMenu) {
+        warnedNoMenu = true;
+        const icons = [...new Set([...host.querySelectorAll('[data-icon]')].map((el) => el.getAttribute('data-icon')))].slice(0, 20);
+        post({ type: 'log', message: `clique direito: não achei o botão de menu (ícones: ${icons.join(', ')})` });
+      }
+      return;
+    }
+    e.preventDefault();
+    button.click();
+  });
 
   // Só tirar o foco não basta: com o foco no <body>, o WhatsApp devolve na hora
   // para o campo de mensagem (e a conversa voltaria). Leva o foco para a conversa

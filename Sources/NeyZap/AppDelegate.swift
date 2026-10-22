@@ -12,21 +12,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private let statusMenu = NSMenu()
 
     private var window: NSWindow { windowController.window! }
+    /// A segunda cópia aberta pede à primeira para mostrar a janela (sem dados: só "mostre-se").
+    private static let showRequest = Notification.Name("local.neyzap.show")
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Uma instância só: duas cópias mexendo nos mesmos dados podem corromper sessões.
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "local.neyzap")
-            .filter { $0 != NSRunningApplication.current }
+            .filter { $0 != NSRunningApplication.current && !$0.isTerminated }
         if let running = others.first {
+            DistributedNotificationCenter.default().postNotificationName(Self.showRequest, object: nil, userInfo: nil, deliverImmediately: true)
             running.activate()
             exit(0)
         }
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(showRequested), name: Self.showRequest, object: nil)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = WebCryptoKey.data
         Notifier.shared.setup()
-        if UserDefaults.standard.bool(forKey: "systemNotifications") { Notifier.shared.requestPermission() }
+        if UserDefaults.standard.bool(forKey: "systemNotifications") { requestSystemNotifications(explain: false) }
         let openNotification: (UUID, String) -> Void = { [weak self] accountID, jsID in
             guard let self else { return }
             // Escolhe a guia antes de mostrar a janela: senão a anterior aparece por um
@@ -57,25 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         debugBridge = DebugBridge(windowController: windowController)
         showWindow()
         Log.write("NeyZap \(UpdateChecker.currentVersion) aberto, \(windowController.sessions.count) guia(s)")
-        removeOrphanedData()
+        windowController.reconcileDataStores()
         // Verificação silenciosa (só aparece algo se houver versão nova): ao abrir e uma vez por dia.
         DispatchQueue.main.asyncAfter(deadline: .now() + 8) { UpdateChecker.check(userInitiated: false) }
         let daily = Timer(timeInterval: 24 * 3600, repeats: true) { _ in UpdateChecker.check(userInitiated: false) }
         daily.tolerance = 3600
         RunLoop.main.add(daily, forMode: .common)
-    }
-
-    /// Dados de guias que já foram fechadas (a remoção pode ter falhado ou o app foi
-    /// encerrado antes): apaga, para nenhuma sessão ficar logada no disco sem guia.
-    private func removeOrphanedData() {
-        let known = Set(AccountStore.shared.accounts.map(\.id))
-        WKWebsiteDataStore.fetchAllDataStoreIdentifiers { ids in
-            for id in ids where !known.contains(id) {
-                WKWebsiteDataStore.remove(forIdentifier: id) { error in
-                    Log.write(error == nil ? "dados de guia fechada removidos" : "não consegui remover dados de guia fechada: \(error!.localizedDescription)")
-                }
-            }
-        }
     }
 
     /// Menu do ícone no Dock: contas (com não lidas), conectar número, atualizações e logs.
@@ -281,6 +272,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     @objc private func showWindowAction() { showWindow() }
+    @objc private func showRequested() {
+        guard windowController != nil else { return }
+        showWindow()
+    }
     @objc private func hideApp() { NSApp.hide(nil) }
 
     @objc private func addAccount() {
@@ -316,7 +311,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let defaults = UserDefaults.standard
         let on = !defaults.bool(forKey: "systemNotifications")
         defaults.set(on, forKey: "systemNotifications")
-        if on { Notifier.shared.requestPermission() }
+        if on { requestSystemNotifications(explain: true) }
+    }
+
+    /// Sem permissão da Central de Notificações nada apareceria: volta para os balões do
+    /// NeyZap e avisa (`explain`: o usuário acabou de ligar a opção; senão só registra).
+    private func requestSystemNotifications(explain: Bool) {
+        Notifier.shared.requestPermission { granted in
+            guard !granted else { return }
+            UserDefaults.standard.set(false, forKey: "systemNotifications")
+            Log.write("notificações do sistema sem permissão: voltando para os balões do NeyZap")
+            guard explain else { return }
+            let alert = NSAlert()
+            alert.messageText = "O macOS não deixou o NeyZap usar as notificações do sistema"
+            alert.informativeText = "As notificações continuam nos balões do próprio NeyZap. Para usar as do sistema, permita o NeyZap em Ajustes do Sistema → Notificações e ligue a opção de novo."
+            alert.runModal()
+        }
     }
 
     @objc private func toggleLaunchAtLogin() {
@@ -341,8 +351,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         let session = windowController.activeSession
         session.dumpLayout { json in
             guard let json else { return }
-            let url = AppPaths.debug.appendingPathComponent("layout-\(session.name).json")
-            try? json.write(to: url, atomically: true, encoding: .utf8)
+            guard let url = AppPaths.writePrivate(Data(json.utf8), to: "layout-\(AppPaths.safeName(session.name)).json") else { return }
             NSWorkspace.shared.activateFileViewerSelecting([url])
         }
     }

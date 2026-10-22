@@ -24,19 +24,30 @@ final class BannerCenter {
     private let margin: CGFloat = 12
     private let maxVisible = 4
     private var banners: [BannerPanel] = [] // o mais novo primeiro
+    /// Balões esperando a foto, por conversa: só o mais recente aparece, e um fechado
+    /// (ou de guia fechada/recarregada) nesse meio-tempo não aparece mais.
+    private var pending: [String: (ticket: Int, content: BannerContent)] = [:]
+    private var ticket = 0
 
     func show(_ content: BannerContent, icon: String) {
+        ticket += 1
+        let mine = ticket
+        pending[content.key] = (mine, content)
         Self.loadAvatar(icon) { [weak self] avatar in
-            self?.present(content, avatar: avatar)
+            guard let self, self.pending[content.key]?.ticket == mine else { return }
+            self.pending.removeValue(forKey: content.key)
+            self.present(content, avatar: avatar)
         }
     }
 
     /// Some com todos os balões de uma guia (guia fechada ou página recarregada).
     func dismissAll(accountID: UUID) {
+        pending = pending.filter { $0.value.content.accountID != accountID }
         banners.filter { $0.content.accountID == accountID }.forEach { dismiss($0) }
     }
 
     func dismiss(accountID: UUID, jsID: String) {
+        pending = pending.filter { !($0.value.content.accountID == accountID && $0.value.content.jsID == jsID) }
         banners.filter { $0.content.accountID == accountID && $0.content.jsID == jsID }.forEach { dismiss($0) }
     }
 

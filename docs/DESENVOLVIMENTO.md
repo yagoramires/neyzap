@@ -64,9 +64,12 @@ logadas** (ler conversas, agir na tela) — use só enquanto desenvolve e deslig
 depois (`defaults write local.neyzap debugBridge -bool false`).
 
 Com `defaults write local.neyzap debugBridge -bool true` e o app reaberto, ele cria
-uma senha em `~/Library/Application Support/NeyZap/debug/token` (arquivo 0600) e só
-aceita comandos que começam com ela. O `scripts/debug.sh` lê a senha e manda o
-comando (saída em `debug/`, arquivos 0600):
+uma senha nova em `~/Library/Application Support/NeyZap/debug/token` (pasta 0700,
+arquivo 0600; apagada ao encerrar ou com o canal desligado) e só aceita comandos que
+começam com ela. O `scripts/debug.sh` grava senha + comando em `debug/command` e
+avisa o app com uma notificação vazia — a senha não aparece na lista de processos
+nem no canal de notificações, que outros programas podem escutar. Saída em `debug/`
+(arquivos 0600; capturas e `eval.txt` são apagados quando o canal é desligado):
 
 | Comando | Efeito |
 | --- | --- |

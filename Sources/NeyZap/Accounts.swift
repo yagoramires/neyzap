@@ -11,22 +11,30 @@ final class AccountStore {
     static let shared = AccountStore()
 
     private let key = "accounts"
+    private let closedKey = "closedAccounts"
     private(set) var accounts: [Account]
+    /// A lista salva não existia ou não pôde ser lida: começou com uma guia nova.
+    private(set) var startedFresh = false
+    /// Guias fechadas cujos dados ainda não foram apagados do disco.
+    private(set) var closed: Set<UUID>
 
     private init() {
+        let closedIDs = UserDefaults.standard.stringArray(forKey: closedKey) ?? []
+        closed = Set(closedIDs.compactMap(UUID.init(uuidString:)))
         if let data = UserDefaults.standard.data(forKey: key),
            let saved = try? JSONDecoder().decode([Account].self, from: data),
            !saved.isEmpty {
             accounts = saved
         } else {
             accounts = [Account(id: UUID(), name: "WhatsApp")]
+            startedFresh = true
             save()
         }
     }
 
     @discardableResult
-    func add(name: String) -> Account {
-        let account = Account(id: UUID(), name: name)
+    func add(name: String, id: UUID = UUID()) -> Account {
+        let account = Account(id: id, name: name)
         accounts.append(account)
         save()
         return account
@@ -38,8 +46,17 @@ final class AccountStore {
         save()
     }
 
+    /// Tira a guia da lista e anota o id: só dados de guias anotadas aqui podem ser
+    /// apagados sem guia (ver MainWindowController.reconcileDataStores).
     func remove(_ id: UUID) {
         accounts.removeAll { $0.id == id }
+        closed.insert(id)
+        save()
+    }
+
+    /// Os dados da guia fechada já foram apagados.
+    func forgetClosed(_ id: UUID) {
+        closed.remove(id)
         save()
     }
 
@@ -47,5 +64,6 @@ final class AccountStore {
         if let data = try? JSONEncoder().encode(accounts) {
             UserDefaults.standard.set(data, forKey: key)
         }
+        UserDefaults.standard.set(closed.map(\.uuidString), forKey: closedKey)
     }
 }
