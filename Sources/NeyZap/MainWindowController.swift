@@ -238,36 +238,64 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         accountPicker.segmentCount = sessions.count
         for (i, session) in sessions.enumerated() {
             accountPicker.setLabel("", forSegment: i)
-            accountPicker.setImage(Self.tabImage(name: session.name, unread: session.unread), forSegment: i)
-            accountPicker.setToolTip(session.unread > 0 ? "\(session.name): \(session.unread) conversa(s) não lida(s)" : session.name, forSegment: i)
+            accountPicker.setImage(Self.tabImage(name: session.name, unread: session.unread, archived: session.archivedUnread), forSegment: i)
+            var tip = session.name
+            if session.unread > 0 { tip += " · \(session.unread) não lida(s)" }
+            if session.archivedUnread > 0 { tip += " · \(session.archivedUnread) arquivada(s)" }
+            accountPicker.setToolTip(tip, forSegment: i)
             accountPicker.setWidth(0, forSegment: i)
         }
         accountPicker.selectedSegment = selectedIndex
         accountPicker.sizeToFit()
     }
 
-    /// Nome da conta + selo vermelho com as não lidas, como o do Dock. Desenhado na
-    /// hora de pintar, então a cor do texto acompanha o tema claro/escuro.
-    private static func tabImage(name: String, unread: Int) -> NSImage {
+    /// Nome da conta + selo vermelho (não lidas) + selo cinza com ícone de arquivo
+    /// (arquivadas não lidas). Desenhado na hora de pintar, então a cor do texto
+    /// acompanha o tema claro/escuro.
+    private static func tabImage(name: String, unread: Int, archived: Int) -> NSImage {
         let font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .medium)
         let text = NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
         let textSize = text.size()
-        let badge = unread > 99 ? "99+" : "\(unread)"
-        let badgeText = NSAttributedString(string: badge, attributes: [
-            .font: NSFont.systemFont(ofSize: 10.5, weight: .bold), .foregroundColor: NSColor.white,
-        ])
         let badgeHeight: CGFloat = 16
-        let badgeWidth = unread > 0 ? max(badgeHeight, badgeText.size().width + 9) : 0
-        let gap: CGFloat = unread > 0 ? 5 : 0
-        let size = NSSize(width: ceil(textSize.width + gap + badgeWidth), height: max(ceil(textSize.height), badgeHeight))
+        let gap: CGFloat = 5
+        let badgeFont = NSFont.systemFont(ofSize: 10.5, weight: .bold)
+
+        struct Badge { let label: NSAttributedString; let icon: NSImage?; let color: NSColor; let width: CGFloat }
+        func badge(_ count: Int, color: NSColor, symbol: String? = nil) -> Badge {
+            let label = NSAttributedString(string: count > 99 ? "99+" : "\(count)", attributes: [.font: badgeFont, .foregroundColor: NSColor.white])
+            let icon = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 8.5, weight: .bold)) }
+            let iconWidth = icon.map { $0.size.width + 3 } ?? 0
+            return Badge(label: label, icon: icon, color: color, width: max(badgeHeight, label.size().width + iconWidth + 9))
+        }
+        var badges: [Badge] = []
+        if unread > 0 { badges.append(badge(unread, color: .systemRed)) }
+        if archived > 0 { badges.append(badge(archived, color: .systemGray, symbol: "archivebox.fill")) }
+
+        let width = textSize.width + badges.reduce(0) { $0 + gap + $1.width }
+        let size = NSSize(width: ceil(width), height: max(ceil(textSize.height), badgeHeight))
         let image = NSImage(size: size, flipped: false) { _ in
             text.draw(at: NSPoint(x: 0, y: (size.height - textSize.height) / 2))
-            guard unread > 0 else { return true }
-            let rect = NSRect(x: textSize.width + gap, y: (size.height - badgeHeight) / 2, width: badgeWidth, height: badgeHeight)
-            NSColor.systemRed.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: badgeHeight / 2, yRadius: badgeHeight / 2).fill()
-            let b = badgeText.size()
-            badgeText.draw(at: NSPoint(x: rect.midX - b.width / 2, y: rect.midY - b.height / 2))
+            var x = textSize.width
+            for b in badges {
+                x += gap
+                let rect = NSRect(x: x, y: (size.height - badgeHeight) / 2, width: b.width, height: badgeHeight)
+                b.color.setFill()
+                NSBezierPath(roundedRect: rect, xRadius: badgeHeight / 2, yRadius: badgeHeight / 2).fill()
+                let labelSize = b.label.size()
+                var contentX = rect.midX - (labelSize.width + (b.icon.map { $0.size.width + 3 } ?? 0)) / 2
+                if let icon = b.icon {
+                    let tinted = NSImage(size: icon.size, flipped: false) { r in
+                        icon.draw(in: r)
+                        NSColor.white.set()
+                        r.fill(using: .sourceAtop)
+                        return true
+                    }
+                    tinted.draw(in: NSRect(x: contentX, y: rect.midY - icon.size.height / 2, width: icon.size.width, height: icon.size.height))
+                    contentX += icon.size.width + 3
+                }
+                b.label.draw(at: NSPoint(x: contentX, y: rect.midY - labelSize.height / 2))
+                x += b.width
+            }
             return true
         }
         image.isTemplate = false

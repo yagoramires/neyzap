@@ -50,7 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         for (i, session) in windowController.sessions.enumerated() {
-            let entry = item(session.unread > 0 ? "\(session.name) (\(session.unread))" : session.name, #selector(selectAccount(_:)), "")
+            var title = session.name
+            var counts: [String] = []
+            if session.unread > 0 { counts.append("\(session.unread)") }
+            if session.archivedUnread > 0 { counts.append("\(session.archivedUnread) arquivada(s)") }
+            if !counts.isEmpty { title += " (\(counts.joined(separator: " · ")))" }
+            let entry = item(title, #selector(selectAccount(_:)), "")
             entry.tag = i
             entry.state = i == windowController.selectedIndex ? .on : .off
             menu.addItem(entry)
