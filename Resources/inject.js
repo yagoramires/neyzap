@@ -322,6 +322,7 @@
     if (!hasMain && hadMain) setView('list');
     hadMain = hasMain;
     updateBackButton();
+    try { updateReadButtons(); } catch (e) { post({ type: 'log', message: `erro em updateReadButtons: ${e}` }); }
   }
 
   let scheduled = false;
@@ -542,35 +543,95 @@
     }, 400);
   }, true);
 
-  // Clique direito numa mensagem ou conversa: quando o WhatsApp não abre o menu dele
-  // (depende do navegador), o WebKit mostraria o menu genérico da página. Nesse caso
-  // abre o mesmo menu do WhatsApp pela setinha que ele mostra ao passar o mouse
-  // (Responder, Reagir, Copiar…). Só abre o menu; a escolha continua com o usuário.
-  // Links, campos de texto e texto selecionado mantêm o menu do sistema.
-  const MENU_ICON = '[data-icon*="down-context"], [data-icon*="chevron-down"], [data-icon="down"], [data-icon*="chevron_down"]';
-  const MENU_LABEL = /^(menu de contexto|context menu|mais opções|more options|abrir menu da conversa|open chat context menu)$/i;
-  let warnedNoMenu = false;
+  // Clique direito: no Mac o WebKit seleciona a palavra sob o mouse antes do evento
+  // e, vendo texto selecionado, o WhatsApp deixa o menu do sistema (para copiar) em
+  // vez do menu dele (Reagir, Responder…). Seleção criada pelo próprio clique é
+  // desfeita antes de o WhatsApp olhar; texto selecionado de propósito continua
+  // abrindo o menu de copiar.
+  let selectedBeforeRightClick = false;
+  const hasSelection = () => String(getSelection() || '').length > 0;
+  window.addEventListener('mousedown', (e) => {
+    if (e.button === 2 || (e.button === 0 && e.ctrlKey)) selectedBeforeRightClick = hasSelection();
+  }, true);
   window.addEventListener('contextmenu', (e) => {
     const t = e.target;
-    if (e.defaultPrevented || !e.isTrusted || !(t instanceof Element)) return;
-    if (t.closest('a[href], [contenteditable="true"], input, textarea') || String(getSelection()).trim()) return;
-    const host = t.closest('#main [data-id], #main [role="row"], #pane-side [role="row"], #pane-side [role="listitem"]');
-    if (!host) return;
-    const labeled = [...host.querySelectorAll('button[aria-label], [role="button"][aria-label]')]
-      .find((b) => MENU_LABEL.test(b.getAttribute('aria-label').trim()));
-    const icon = host.querySelector(MENU_ICON);
-    const button = labeled || (icon && (icon.closest('button, [role="button"]') || icon));
-    if (!button) {
-      if (!warnedNoMenu) {
-        warnedNoMenu = true;
-        const icons = [...new Set([...host.querySelectorAll('[data-icon]')].map((el) => el.getAttribute('data-icon')))].slice(0, 20);
-        post({ type: 'log', message: `clique direito: não achei o botão de menu (ícones: ${icons.join(', ')})` });
+    if (selectedBeforeRightClick || !(t instanceof Element) || !hasSelection()) return;
+    if (t.closest('a[href], [contenteditable="true"], input, textarea')) return;
+    if (t.closest('#main [data-id], #pane-side')) getSelection().removeAllRanges();
+  }, true);
+
+  // ---------------------------------------------------------------------------
+  // Botão "marcar como lida" à esquerda da foto nas conversas não lidas (lista
+  // principal e Arquivadas). O clique do usuário abre o menu da própria conversa (o
+  // mesmo do clique direito) e escolhe "Marcar como lida", como faria à mão, sem
+  // abrir a conversa. O botão mora na linha (rola junto); o CSS abre o espaço.
+  // ---------------------------------------------------------------------------
+  const UNREAD_LABEL = /n[ãa]o lida|unread/i;
+  const MARK_READ = /marcar como lida|mark as read/i;
+  const READ_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4.5 12.5l4.5 4.5 10.5-10.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const CHAT_ROWS = ':is(#pane-side, [data-testid="archived-chatlist"]) :is([role="row"], [role="listitem"])';
+
+  const rowIsUnread = (row) => !row.querySelector('[data-testid="chatlist-panel-archived-button"]')
+    && [...row.querySelectorAll('span[aria-label]')].some((s) => UNREAD_LABEL.test(s.getAttribute('aria-label')));
+
+  function updateReadButtons() {
+    if (document.visibilityState !== 'visible') return;
+    // O WhatsApp reaproveita as linhas: botão em linha que não está mais não lida sai.
+    document.querySelectorAll('.nz-read').forEach((b) => {
+      const row = b.closest('[role="row"], [role="listitem"]');
+      if (!row || !rowIsUnread(row)) b.remove();
+    });
+    for (const row of document.querySelectorAll(CHAT_ROWS)) {
+      const cell = row.querySelector('[data-testid="cell-frame-container"]');
+      if (!cell || cell.querySelector(':scope > .nz-read') || !rowIsUnread(row)) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'nz-read';
+      button.title = 'Marcar como lida';
+      button.setAttribute('aria-label', 'Marcar como lida');
+      button.innerHTML = READ_ICON;
+      // Nada do clique chega à linha (ela abriria a conversa no mousedown).
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'dblclick', 'contextmenu']) {
+        button.addEventListener(type, (e) => e.stopPropagation());
       }
-      return;
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const current = button.closest('[role="row"], [role="listitem"]');
+        if (current) markRead(current, button);
+      });
+      cell.appendChild(button);
     }
-    e.preventDefault();
-    button.click();
-  });
+  }
+
+  async function markRead(row, button) {
+    const title = row.querySelector('[data-testid="cell-frame-title"] span, [data-testid="cell-frame-title"]');
+    if (!title || button.disabled) return;
+    button.disabled = true;
+    root.dataset.nzMarking = ''; // o menu abre invisível (CSS)
+    try {
+      const r = title.getBoundingClientRect();
+      title.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: r.left + 5, clientY: r.top + 5, view: window }));
+      let item = null;
+      for (let i = 0; i < 30 && !item; i++) {
+        await wait(50);
+        item = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')]
+          .find((el) => MARK_READ.test(el.textContent) && !UNREAD_LABEL.test(el.textContent));
+      }
+      if (item) {
+        item.click();
+      } else {
+        const open = document.querySelector('[role="menu"] [role="menuitem"]');
+        if (open) ['keydown', 'keyup'].forEach((type) => open.dispatchEvent(new KeyboardEvent(type, { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true })));
+        post({ type: 'log', message: 'marcar como lida: opção não encontrada no menu da conversa' });
+      }
+    } finally {
+      await wait(150);
+      delete root.dataset.nzMarking;
+      button.disabled = false;
+      schedule();
+    }
+  }
 
   // Só tirar o foco não basta: com o foco no <body>, o WhatsApp devolve na hora
   // para o campo de mensagem (e a conversa voltaria). Leva o foco para a conversa

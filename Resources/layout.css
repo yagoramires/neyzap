@@ -219,3 +219,50 @@ html[data-nz-compact] #expressions-panel-container [role="application"] {
 #nz-back:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
+
+/* ---------- Botão "marcar como lida" (inject.js) ---------- */
+
+/* Espaço à esquerda da foto nas conversas não lidas, onde fica o botão. */
+:is(#pane-side, [data-testid="archived-chatlist"]) :is([role="row"], [role="listitem"]):has(span[aria-label*="não lida" i], span[aria-label*="nao lida" i], span[aria-label*="unread" i]) [data-testid="cell-frame-container"] {
+  padding-left: 22px !important;
+}
+
+[data-testid="cell-frame-container"]:has(> .nz-read) {
+  position: relative !important;
+}
+
+.nz-read {
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--icon, #8696a0);
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.nz-read:hover {
+  opacity: 1;
+  color: #fff;
+  background: #21c063;
+}
+
+.nz-read:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Enquanto o botão usa o menu da conversa, o menu não aparece. */
+html[data-nz-marking] [role="menu"],
+html[data-nz-marking] div:has(> div > div > div > [role="menu"]) {
+  opacity: 0 !important;
+}

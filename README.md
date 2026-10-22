@@ -37,6 +37,10 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
 - **Janela de qualquer tamanho** — abaixo de 760 px vira uma coluna por vez, como
   no celular, com botão de voltar (⌘[). Painéis, emojis, fotos e prévias de envio
   se ajustam à largura.
+- **Marcar como lida num clique** — nas conversas não lidas (inclusive nas
+  Arquivadas) aparece um ✓ à esquerda da foto: marca como lida sem abrir a conversa.
+- **Clique direito como no navegador** — abre o menu do WhatsApp (Reagir, Responder,
+  Copiar…) em qualquer parte da mensagem, inclusive em cima do texto.
 - **Notificações com a foto do contato** — mostram o nome da guia em cima
   do nome, abrem a conversa no clique e não somem com o mouse em cima.
 - **Mais limpo** — título NeyZap, sem Meta AI, sem propaganda do app oficial e sem barras
@@ -83,10 +87,11 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
 
 - O código injetado no WhatsApp Web **só mexe na aparência** e lê a tela para
   notificações e contadores. Ele nunca envia mensagens, nunca automatiza ações e
-  nunca acessa os módulos internos do WhatsApp. A única exceção é clicar em
-  **Ativar** no aviso "notificações desativadas" e ligar a **Sincronização em
-  segundo plano** nas configurações (com a conta fora da tela) — preferências
-  locais deste Mac.
+  nunca acessa os módulos internos do WhatsApp. As únicas ações automáticas são
+  clicar em **Ativar** no aviso "notificações desativadas" e ligar a
+  **Sincronização em segundo plano** nas configurações (com a conta fora da tela) —
+  preferências locais deste Mac. O ✓ de marcar como lida só age quando você clica
+  nele, escolhendo "Marcar como lida" no menu da própria conversa.
 - Tudo fica no seu Mac: sessões em armazenamentos separados por conta, nada é
   enviado para servidores além do próprio WhatsApp. A verificação de atualização
   só consulta a lista de versões deste repositório.
