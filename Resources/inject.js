@@ -322,51 +322,9 @@
     promoTimer = setTimeout(() => { promoTimer = 0; hidePromos(); }, 1500);
   }
 
-  // Aviso "As notificações de mensagens estão desativadas": quem notifica é o
-  // NeyZap, então ele só confunde. Os outros avisos dessa faixa continuam.
-  const NOTIFICATIONS_OFF = /notifica[çc][õo]es de mensagens est[ãa]o desativadas|message notifications are off|turn on (desktop )?notifications/i;
-
-  // Título "WhatsApp" no topo da lista vira "NeyZap" (só o texto do cabeçalho,
-  // perto do topo; contatos e mensagens nunca são tocados).
-  function renameTitle() {
-    const side = document.querySelector('[data-nz="side"]');
-    if (!side) return;
-    const top = side.getBoundingClientRect().top;
-    const walker = document.createTreeWalker(side, NodeFilter.SHOW_TEXT);
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const text = n.data.trim();
-      if (text !== 'WhatsApp' && text !== 'WhatsApp Business') continue;
-      const el = n.parentElement;
-      if (!el || el.closest('#pane-side') || el.getBoundingClientRect().top - top > 80) continue;
-      n.data = n.data.replace(text, 'NeyZap');
-    }
-  }
-
-  // Não lidas arquivadas: o título da página só conta as conversas normais; o
-  // número das arquivadas aparece na linha "Arquivadas" da lista (só leitura).
-  let lastArchived = -1;
-  function reportArchived() {
-    const row = document.querySelector('[data-testid="chatlist-panel-archived-button"]');
-    let count = 0;
-    if (row) {
-      const digits = [...row.querySelectorAll('*')].find((e) => e.childElementCount === 0 && /^\d+$/.test(e.textContent.trim()));
-      count = digits ? parseInt(digits.textContent.trim(), 10) : 0;
-    }
-    if (count !== lastArchived) {
-      lastArchived = count;
-      post({ type: 'archived', count });
-    }
-  }
-
   function hidePromos() {
     reportArchived();
     renameTitle();
-    const bar = document.querySelector('[data-testid="chat-butterbar"]');
-    if (bar) {
-      for (const child of bar.children) {
-        if (NOTIFICATIONS_OFF.test(child.textContent)) child.setAttribute('data-nz-hide', '');
-      }
-    }
     const roots = [document.querySelector('[data-nz="side"]'), document.querySelector('[data-nz="main"]')].filter(Boolean);
     for (const r of roots) {
       const walker = document.createTreeWalker(r, NodeFilter.SHOW_TEXT);
