@@ -29,7 +29,10 @@ senha a cada build.
 2. `scripts/build.sh`, confira a assinatura (`codesign -dv build/NeyZap.app` deve
    mostrar `Authority=NeyZap Local Signing`) e
    `ditto -c -k --keepParent build/NeyZap.app NeyZap-X.Y.Z.zip`.
-3. `gh release create vX.Y.Z NeyZap-X.Y.Z.zip` — o app avisa quem estiver numa versão anterior.
+3. `gh release create vX.Y.Z NeyZap-X.Y.Z.zip` — quem estiver numa versão anterior
+   recebe sozinho: o app baixa o zip, só aceita um NeyZap da versão do release
+   assinado com o mesmo certificado (requisito de assinatura do app aberto), troca o
+   bundle e reinicia (ou instala ao fechar). O zip precisa conter `NeyZap.app` na raiz.
 
 ## Tema
 
@@ -104,7 +107,7 @@ Sources/NeyZap/
   AccountSession.swift        WKWebView por conta, downloads, notificações, permissões
   NotificationBanner.swift    notificações com a foto do contato
   Notifier.swift              Central de Notificações (modo "notificações do sistema")
-  UpdateChecker.swift         procura versões novas nos releases do GitHub
+  UpdateChecker.swift         baixa, confere e instala versões novas dos releases
   Log.swift                   log de depuração (~/Library/Logs/NeyZap)
   WebCryptoKey.swift          chave mestra do WebCrypto fora do Chaveiro
   DebugBridge.swift           comandos de depuração vindos do terminal
