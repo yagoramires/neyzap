@@ -72,7 +72,9 @@ internos do WhatsApp (`window.Store` e afins).
 Única exceção: quando aparece o aviso "As notificações de mensagens estão
 desativadas", o script clica no **Ativar** dele. Isso só liga a preferência local
 de notificações do WhatsApp Web neste Mac (nada vai para o servidor) e fica
-registrado no log de depuração.
+registrado no log de depuração. Do mesmo jeito, uma vez por dia e só com a conta
+fora da tela, ele abre Configurações → Notificações e liga a **Sincronização em
+segundo plano** se estiver desligada, voltando em seguida às conversas.
 
 ## Estrutura
 

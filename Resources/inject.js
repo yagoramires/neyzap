@@ -304,7 +304,10 @@
   function schedule() {
     if (scheduled) return;
     scheduled = true;
-    requestAnimationFrame(() => { scheduled = false; tick(); });
+    // Página escondida não recebe requestAnimationFrame: usa temporizador.
+    const run = () => { scheduled = false; tick(); };
+    if (document.visibilityState === 'visible') requestAnimationFrame(run);
+    else setTimeout(run, 100);
     schedulePromoScan();
   }
 
@@ -374,8 +377,65 @@
     }
   }
 
+  // "Sincronização em segundo plano" (Configurações → Notificações) ligada por
+  // padrão: com a conta fora da tela, abre a tela de configurações, liga a opção
+  // se estiver desligada e volta às conversas. No máximo uma vez por dia por conta;
+  // para na hora se a conta voltar para a tela. Só muda essa preferência local.
+  const BG_SYNC = /sincroniza[çc][ãa]o em segundo plano|background sync/i;
+  let bgSyncRunning = false;
+  let bgSyncDone = Date.now() - (cfg.bgSyncCheckedAt || 0) < 24 * 3600 * 1000;
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const hiddenNow = () => document.visibilityState !== 'visible';
+  const railButton = (labels) => [...document.querySelectorAll('header button[aria-label], [data-nz="left"] button')]
+    .find((b) => labels.includes(b.getAttribute('aria-label')));
+  // Painéis da esquerda (configurações), fora da lista de conversas e da conversa.
+  const panelNodes = () => [...document.querySelectorAll('#app *')]
+    .filter((e) => !e.closest('#pane-side, #main'));
+  const clickable = (el) => {
+    for (let c = el, i = 0; c && i < 8; c = c.parentElement, i++) {
+      if (c.tagName === 'BUTTON' || c.getAttribute('role') === 'button' || c.getAttribute('tabindex') === '0') return c;
+    }
+    return el;
+  };
+
+  async function ensureBackgroundSync() {
+    if (bgSyncDone || bgSyncRunning || !hiddenNow() || !document.getElementById('side')) return;
+    bgSyncRunning = true;
+    try {
+      const settings = railButton(['Configurações', 'Settings']) || railButton(['Você', 'You']);
+      if (!settings) return;
+      settings.click();
+      await wait(1200);
+      if (!hiddenNow()) return;
+      const item = panelNodes()
+        .find((e) => e.childElementCount === 0 && /^(notificações|notifications)$/i.test(e.textContent.trim()));
+      if (!item) return;
+      clickable(item).click();
+      await wait(1200);
+      if (!hiddenNow()) return;
+      const toggle = [...document.querySelectorAll('#app input[role="switch"], #app input[type="checkbox"]')]
+        .find((input) => {
+          let row = input;
+          for (let i = 0; i < 6 && row.parentElement; i++) row = row.parentElement;
+          return BG_SYNC.test(row.textContent);
+        });
+      if (!toggle) return;
+      if (!toggle.checked) {
+        toggle.click();
+        await wait(500);
+        post({ type: 'log', message: 'sincronização em segundo plano estava desligada: ligada automaticamente' });
+      }
+      bgSyncDone = true;
+      post({ type: 'bgsync' });
+    } finally {
+      bgSyncRunning = false;
+      if (hiddenNow()) railButton(['Conversas', 'Chats'])?.click();
+    }
+  }
+
   // Tarefas periódicas: cada uma isolada, para uma falha não derrubar as outras.
   function housekeeping() {
+    if (!bgSyncDone && !bgSyncRunning && hiddenNow()) ensureBackgroundSync().catch((e) => post({ type: 'log', message: `erro em ensureBackgroundSync: ${e}` }));
     for (const task of [enableNotifications, reportArchived, renameTitle, hidePromos]) {
       try { task(); } catch (e) { post({ type: 'log', message: `erro em ${task.name}: ${e}` }); }
     }
