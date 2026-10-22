@@ -169,6 +169,8 @@ extension AccountSession: WKScriptMessageHandler {
                 tag: tag,
                 silent: body["silent"] as? Bool ?? false
             )
+        case "log":
+            Log.write("[\(name)] \(body["message"] as? String ?? "")")
         case "archived":
             archivedUnread = body["count"] as? Int ?? 0
         case "notifyClose":

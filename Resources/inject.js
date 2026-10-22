@@ -322,7 +322,28 @@
     promoTimer = setTimeout(() => { promoTimer = 0; hidePromos(); }, 1500);
   }
 
+  // Aviso "As notificações de mensagens estão desativadas": depois de logar de
+  // novo, o WhatsApp deixa a preferência local de notificações desligada até
+  // alguém clicar em "Ativar". Única ação automática do script: clica nesse
+  // botão (só muda essa preferência deste Mac; nada vai para o servidor).
+  const NOTIFICATIONS_OFF = /notifica[çc][õo]es de mensagens est[ãa]o desativadas|message notifications are off/i;
+  const clickedEnable = new WeakSet();
+  function enableNotifications() {
+    const bar = document.querySelector('[data-testid="chat-butterbar"]');
+    if (!bar) return;
+    for (const box of bar.children) {
+      if (!NOTIFICATIONS_OFF.test(box.textContent)) continue;
+      const label = [...box.querySelectorAll('*')].find((e) => e.childElementCount === 0 && /^(ativar|turn on)$/i.test(e.textContent.trim()));
+      const target = label && (label.closest('button, [role="button"], a') || label);
+      if (!target || clickedEnable.has(target)) continue;
+      clickedEnable.add(target);
+      target.click();
+      post({ type: 'log', message: 'notificações do WhatsApp estavam desligadas: ativadas automaticamente' });
+    }
+  }
+
   function hidePromos() {
+    enableNotifications();
     reportArchived();
     renameTitle();
     const roots = [document.querySelector('[data-nz="side"]'), document.querySelector('[data-nz="main"]')].filter(Boolean);

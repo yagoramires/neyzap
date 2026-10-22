@@ -77,7 +77,9 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
 
 - O código injetado no WhatsApp Web **só mexe na aparência** e lê a tela para
   notificações e contadores. Ele nunca envia mensagens, nunca automatiza ações e
-  nunca acessa os módulos internos do WhatsApp.
+  nunca acessa os módulos internos do WhatsApp. A única exceção é clicar em
+  **Ativar** no aviso "notificações desativadas", que só liga a preferência local
+  de notificações deste Mac.
 - Tudo fica no seu Mac: sessões em armazenamentos separados por conta, nada é
   enviado para servidores além do próprio WhatsApp. A verificação de atualização
   só consulta a lista de versões deste repositório.

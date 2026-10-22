@@ -69,6 +69,11 @@ Para a conta não correr risco, o script injetado só mexe em apresentação e l
 tela. Nunca envia mensagens, nunca automatiza ações e nunca acessa os módulos
 internos do WhatsApp (`window.Store` e afins).
 
+Única exceção: quando aparece o aviso "As notificações de mensagens estão
+desativadas", o script clica no **Ativar** dele. Isso só liga a preferência local
+de notificações do WhatsApp Web neste Mac (nada vai para o servidor) e fica
+registrado no log de depuração.
+
 ## Estrutura
 
 ```
