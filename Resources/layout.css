@@ -98,7 +98,8 @@ html[data-nz-compact][data-nz-view="list"] [data-nz="main"],
 html[data-nz-compact][data-nz-view="list"] [data-nz="drawer"],
 html[data-nz-compact]:not([data-nz-drawer]) [data-nz="drawer"],
 html[data-nz-compact][data-nz-view="chat"] [data-nz="side"],
-html[data-nz-compact][data-nz-view="chat"] [data-nz="left"] {
+html[data-nz-compact][data-nz-view="chat"] [data-nz="left"],
+html[data-nz-compact] [data-nz="drawer"]:empty {
   position: fixed !important;
   left: -200vw !important;
   top: 0 !important;
@@ -107,8 +108,10 @@ html[data-nz-compact][data-nz-view="chat"] [data-nz="left"] {
   pointer-events: none !important;
 }
 
-/* Painel da direita aberto: ocupa a tela toda por cima da conversa. */
-html[data-nz-compact][data-nz-view="chat"][data-nz-drawer] [data-nz="drawer"] {
+/* Painel da direita aberto: ocupa a tela toda por cima da conversa. A coluna
+   vazia que o WhatsApp põe depois dele (com "Dados da mensagem") fica de fora,
+   senão cobriria o painel e engoliria os cliques. */
+html[data-nz-compact][data-nz-view="chat"][data-nz-drawer] [data-nz="drawer"]:not(:empty) {
   position: absolute !important;
   inset: 0 !important;
   z-index: 300 !important; /* a coluna da conversa já usa 100 */
