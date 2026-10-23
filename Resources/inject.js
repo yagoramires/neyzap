@@ -533,7 +533,7 @@
   document.addEventListener('click', (e) => {
     const t = e.target;
     if (!(t instanceof Element) || !t.closest('#pane-side [role="row"], #pane-side [role="listitem"]')
-      || t.closest('[data-testid="chatlist-panel-archived-button"]')) return;
+      || t.closest('[data-testid="chatlist-panel-archived-button"], .nz-read')) return;
     const before = chatTitle();
     const fromList = root.dataset.nzView === 'list';
     setTimeout(() => {
