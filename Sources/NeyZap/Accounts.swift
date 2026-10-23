@@ -1,8 +1,12 @@
 import Foundation
 
 struct Account: Codable, Equatable {
+    enum Site: String, Codable { case whatsapp, instagram }
+
     let id: UUID
     var name: String
+    /// nil nas guias salvas antes de existir o Instagram (= WhatsApp).
+    var site: Site?
 }
 
 /// Lista de contas (números) persistida no UserDefaults. Cada conta tem um
@@ -33,8 +37,8 @@ final class AccountStore {
     }
 
     @discardableResult
-    func add(name: String, id: UUID = UUID()) -> Account {
-        let account = Account(id: id, name: name)
+    func add(name: String, id: UUID = UUID(), site: Account.Site? = nil) -> Account {
+        let account = Account(id: id, name: name, site: site)
         accounts.append(account)
         save()
         return account

@@ -11,7 +11,7 @@ final class TabBarView: NSView {
     }
 
     var onSelect: ((UUID) -> Void)?
-    var onAdd: (() -> Void)?
+    var onAdd: ((Account.Site) -> Void)?
     var onRename: ((UUID, String) -> Void)?
     var onClose: ((UUID) -> Void)?
     var onResetSession: ((UUID) -> Void)?
@@ -92,7 +92,15 @@ final class TabBarView: NSView {
         NSSize(width: min(stack.fittingSize.width, maxWidth), height: 28)
     }
 
-    @objc private func addTapped() { onAdd?() }
+    @objc private func addTapped() {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "WhatsApp", action: #selector(addWhatsApp), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Instagram", action: #selector(addInstagram), keyEquivalent: "").target = self
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: addButton.bounds.maxY + 4), in: addButton)
+    }
+
+    @objc private func addWhatsApp() { onAdd?(.whatsapp) }
+    @objc private func addInstagram() { onAdd?(.instagram) }
 }
 
 // MARK: - Guia
