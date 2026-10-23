@@ -62,6 +62,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         tabBar.onRename = { [weak self] id, name in self?.rename(accountID: id, to: name) }
         tabBar.onClose = { [weak self] id in self?.confirmClose(accountID: id) }
         tabBar.onResetSession = { [weak self] id in self?.confirmReset(accountID: id) }
+        tabBar.onToggleDisabled = { [weak self] id in self?.toggleDisabled(accountID: id) }
         tabBar.onEditingEnded = { [weak self] in
             guard let self else { return }
             self.window?.makeFirstResponder(self.activeSession.webView)
@@ -73,13 +74,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         window.toolbar = toolbar
         window.toolbarStyle = .unifiedCompact
 
-        sessions = AccountStore.shared.accounts.map(makeSession)
+        sessions = AccountStore.shared.accounts.map { makeSession($0) }
         selectedIndex = min(defaults.integer(forKey: "selectedAccount"), sessions.count - 1)
         if isPinned { window.level = .floating }
         layoutSessions()
 
         let memoryCheck = Timer(timeInterval: 300, repeats: true) { [weak self] _ in
             self?.sessions.forEach { $0.reloadIfOverMemory(minimumLimit: 1 << 30) }
+            self?.keepDisabledLinked()
         }
         memoryCheck.tolerance = 60
         RunLoop.main.add(memoryCheck, forMode: .common)
@@ -92,13 +94,51 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     // MARK: - Contas
 
-    private func makeSession(_ account: Account) -> AccountSession {
-        let session = AccountSession(account: account)
+    private func makeSession(_ account: Account, keepAlive: Bool = false) -> AccountSession {
+        let session = AccountSession(account: account, keepAlive: keepAlive)
         session.onUnreadChange = { [weak self] in
             self?.refreshTabs()
             self?.onUnreadChange?()
         }
+        session.onEnable = { [weak self, id = account.id] in self?.toggleDisabled(accountID: id) }
         return session
+    }
+
+    /// Desativar troca a sessão por uma que não carrega: a WebView antiga é liberada
+    /// e o processo da página fecha. Ativar cria uma sessão nova, que carrega normal.
+    func toggleDisabled(accountID: UUID) {
+        guard let i = sessions.firstIndex(where: { $0.accountID == accountID }) else { return }
+        let old = sessions[i]
+        AccountStore.shared.setDisabled(accountID, !old.isDisabled)
+        if !old.isDisabled { defaults.set(Date(), forKey: "lastOnline-\(accountID.uuidString)") }
+        Log.write("[\(old.name)] guia \(old.isDisabled ? "ativada" : "desativada")")
+        replaceSession(at: i)
+    }
+
+    private func replaceSession(at i: Int, keepAlive: Bool = false) {
+        let old = sessions[i]
+        guard let account = AccountStore.shared.accounts.first(where: { $0.id == old.accountID }) else { return }
+        old.webView.removeFromSuperview()
+        BannerCenter.shared.dismissAll(accountID: old.accountID)
+        sessions[i] = makeSession(account, keepAlive: keepAlive)
+        layoutSessions()
+        onUnreadChange?() // atualiza selos, Dock e menus
+    }
+
+    /// O WhatsApp desconecta aparelhos que passam muito tempo sem se conectar: guia de
+    /// WhatsApp desativada há 7 dias conecta escondida por 15 min e volta a desligar.
+    private func keepDisabledLinked() {
+        for (i, session) in sessions.enumerated() where session.isDisabled && !session.isInstagram {
+            let key = "lastOnline-\(session.accountID.uuidString)"
+            if let started = session.keepAliveStarted {
+                guard started.timeIntervalSinceNow < -15 * 60 else { continue }
+                defaults.set(Date(), forKey: key)
+                Log.write("[\(session.name)] desativada: conexão de manutenção feita")
+                replaceSession(at: i)
+            } else if (defaults.object(forKey: key) as? Date ?? .distantPast).timeIntervalSinceNow < -7 * 86400 {
+                replaceSession(at: i, keepAlive: true)
+            }
+        }
     }
 
     func select(index: Int) {
@@ -175,6 +215,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         AccountStore.shared.remove(id)
         BannerCenter.shared.dismissAll(accountID: id)
         defaults.removeObject(forKey: "bgSyncCheckedAt-\(id.uuidString)")
+        defaults.removeObject(forKey: "lastOnline-\(id.uuidString)")
         if let keep, let i = sessions.firstIndex(where: { $0.accountID == keep }) {
             selectedIndex = i
         } else {
@@ -232,7 +273,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     private func selectTab(_ id: UUID) {
         guard let i = sessions.firstIndex(where: { $0.accountID == id }) else { return }
-        if isSideBySide {
+        // Guia desativada só aparece lado a lado enquanto selecionada: o layout muda.
+        if isSideBySide && !sessions[i].isDisabled && !selectedSession.isDisabled {
             selectedIndex = i
             defaults.set(i, forKey: "selectedAccount")
             window?.makeFirstResponder(selectedSession.webView)
@@ -245,7 +287,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     // MARK: - Layout
 
     private func layoutSessions() {
-        let visible = isSideBySide ? sessions : [selectedSession]
+        let visible = isSideBySide ? sessions.filter { !$0.isDisabled || $0 === selectedSession } : [selectedSession]
         for view in splitView.arrangedSubviews where !visible.contains(where: { $0.webView === view }) {
             splitView.removeArrangedSubview(view)
             view.removeFromSuperview()
@@ -379,7 +421,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     private func refreshTabs() {
         tabBar.maxWidth = max(120, (window?.frame.width ?? 800) - 190)
-        let tabs = sessions.map { TabBarView.Tab(id: $0.accountID, name: $0.name, unread: $0.unread, archived: $0.archivedUnread) }
+        let tabs = sessions.map { TabBarView.Tab(id: $0.accountID, name: $0.name, unread: $0.unread, archived: $0.archivedUnread, disabled: $0.isDisabled) }
         tabBar.update(tabs: tabs, selected: sessions.indices.contains(selectedIndex) ? selectedSession.accountID : nil)
     }
 
@@ -416,6 +458,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     /// Janela fechada ou app escondido: os reels param de tocar.
     private func pauseInstagram() {
-        sessions.filter(\.isInstagram).forEach { $0.webView.pauseAllMediaPlayback() }
+        sessions.filter { $0.isInstagram && !$0.isDisabled }.forEach { $0.webView.pauseAllMediaPlayback() }
     }
 }

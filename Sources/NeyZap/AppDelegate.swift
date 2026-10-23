@@ -242,6 +242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             menu.addItem(item("Nova guia", #selector(addAccount), "t"))
             menu.addItem(item("Nova guia do Instagram", #selector(addInstagram), "T"))
             menu.addItem(item("Renomear guia…", #selector(renameAccount), ""))
+            menu.addItem(item(windowController.activeSession.isDisabled ? "Ativar guia" : "Desativar guia", #selector(toggleDisabled), ""))
             menu.addItem(item("Fechar guia…", #selector(removeAccount), ""))
             menu.addItem(.separator())
             menu.addItem(item("Recarregar", #selector(reload), "r"))
@@ -289,6 +290,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
     @objc private func renameAccount() { windowController.promptRename(accountID: windowController.activeSession.accountID) }
     @objc private func removeAccount() { windowController.confirmClose(accountID: windowController.activeSession.accountID) }
+    @objc private func toggleDisabled() { windowController.toggleDisabled(accountID: windowController.activeSession.accountID) }
     @objc private func resetSession() { windowController.confirmReset(accountID: windowController.activeSession.accountID) }
 
     @objc private func reload() { windowController.activeSession.reload() }

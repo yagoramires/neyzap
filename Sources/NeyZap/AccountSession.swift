@@ -20,6 +20,13 @@ final class AccountSession: NSObject {
     /// Guia do Instagram: o site puro, sem nada do inject.js/layout.css (que são do WhatsApp).
     let isInstagram: Bool
     let home: URL
+    /// Desativada: a WebView nunca carrega (o WebKit só abre o processo da página na
+    /// primeira carga); no lugar aparece um aviso com o botão Ativar.
+    let isDisabled: Bool
+    /// Guia desativada conectando escondida por um tempo, para o WhatsApp não
+    /// desconectar o aparelho por inatividade (ver MainWindowController.keepDisabledLinked).
+    let keepAliveStarted: Date?
+    var onEnable: (() -> Void)?
 
     var onUnreadChange: (() -> Void)?
     private(set) var unread = 0 {
@@ -36,10 +43,12 @@ final class AccountSession: NSObject {
     private var recentCrashes: [Date] = []
     private static let externalSchemes: Set<String> = ["mailto", "tel", "sms", "facetime", "facetime-audio"]
 
-    init(account: Account) {
+    init(account: Account, keepAlive: Bool = false) {
         accountID = account.id
         name = account.name
         isInstagram = account.site == .instagram
+        isDisabled = account.disabled == true
+        keepAliveStarted = isDisabled && keepAlive ? Date() : nil
         home = URL(string: isInstagram ? "https://www.instagram.com/" : "https://web.whatsapp.com/")!
 
         let config = WKWebViewConfiguration()
@@ -68,12 +77,17 @@ final class AccountSession: NSObject {
         webView.isInspectable = true
         webView.pageZoom = CGFloat(UserDefaults.standard.object(forKey: "zoom") as? Double ?? 1)
 
-        if !isInstagram {
+        if !isInstagram && !isDisabled {
             titleObservation = webView.observe(\.title, options: [.initial, .new]) { [weak self] webView, _ in
                 self?.updateUnread(from: webView.title)
             }
         }
 
+        if isDisabled {
+            showDisabledPlaceholder()
+            guard keepAliveStarted != nil else { return }
+            Log.write("[\(account.name)] desativada: conectando escondida para o aparelho continuar conectado")
+        }
         Log.write("[\(account.name)] carregando \(home.host ?? "")")
         webView.load(URLRequest(url: home))
     }
@@ -86,6 +100,7 @@ final class AccountSession: NSObject {
     // MARK: - Ações vindas do app
 
     func reload() {
+        if isDisabled { return }
         if webView.url == nil { webView.load(URLRequest(url: home)) } else { webView.reload() }
     }
 
@@ -93,7 +108,7 @@ final class AccountSession: NSObject {
     func resetSession() {
         let store = webView.configuration.websiteDataStore
         store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) { [weak self] in
-            guard let self else { return }
+            guard let self, !self.isDisabled else { return }
             self.webView.load(URLRequest(url: self.home))
         }
     }
@@ -140,6 +155,7 @@ final class AccountSession: NSObject {
     }
 
     func back() {
+        if isDisabled { return }
         if isInstagram { webView.goBack(); return }
         webView.evaluateJavaScript("window.__neyzap && __neyzap.back()")
     }
@@ -150,12 +166,14 @@ final class AccountSession: NSObject {
 
     func applyUserCSS(_ css: String) {
         installUserScripts(userCSS: css)
+        if isDisabled { return }
         webView.evaluateJavaScript("window.__neyzap && __neyzap.setUserCSS(\(jsLiteral(css)))")
     }
 
     /// Reaplica layout.css/inject.js depois de trocados (recarga a quente na depuração).
     func reloadResources(jsChanged: Bool) {
         installUserScripts(userCSS: UserStyle.shared.css)
+        if isDisabled { return }
         if jsChanged {
             webView.reload()
         } else {
@@ -170,6 +188,37 @@ final class AccountSession: NSObject {
     }
 
     // MARK: - Internos
+
+    private func showDisabledPlaceholder() {
+        let box = NSBox()
+        box.boxType = .custom
+        box.borderWidth = 0
+        box.fillColor = .windowBackgroundColor
+        box.frame = webView.bounds
+        box.autoresizingMask = [.width, .height]
+
+        let title = NSTextField(labelWithString: "“\(name)” está desativada")
+        title.font = .systemFont(ofSize: 15, weight: .semibold)
+        let detail = NSTextField(labelWithString: "Não carrega nem recebe mensagens até ser ativada. O login continua salvo.")
+        detail.textColor = .secondaryLabelColor
+        let button = NSButton(title: "Ativar", target: self, action: #selector(enableTapped))
+        button.bezelStyle = .push
+        button.keyEquivalent = "\r"
+        let stack = NSStackView(views: [title, detail, button])
+        stack.orientation = .vertical
+        stack.spacing = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        box.contentView?.addSubview(stack)
+        if let content = box.contentView {
+            NSLayoutConstraint.activate([
+                stack.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+                stack.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            ])
+        }
+        webView.addSubview(box)
+    }
+
+    @objc private func enableTapped() { onEnable?() }
 
     private func installUserScripts(userCSS: String) {
         let controller = webView.configuration.userContentController
@@ -211,6 +260,8 @@ extension AccountSession: WKScriptMessageHandler {
         // Só o próprio script, no quadro principal do WhatsApp Web (não iframes de prévias).
         guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == "web.whatsapp.com",
               let raw = message.body as? [String: Any], let type = raw["type"] as? String else { return }
+        // Desativada conectando só para manter o aparelho: sem notificações nem selos.
+        if isDisabled && type != "log" { return }
         var body: [String: Any] = [:]
         for (key, value) in raw {
             guard let text = value as? String else { body[key] = value; continue }

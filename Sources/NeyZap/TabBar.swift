@@ -8,6 +8,7 @@ final class TabBarView: NSView {
         var name: String
         var unread: Int
         var archived: Int
+        var disabled: Bool
     }
 
     var onSelect: ((UUID) -> Void)?
@@ -15,6 +16,7 @@ final class TabBarView: NSView {
     var onRename: ((UUID, String) -> Void)?
     var onClose: ((UUID) -> Void)?
     var onResetSession: ((UUID) -> Void)?
+    var onToggleDisabled: ((UUID) -> Void)?
     /// Terminou de renomear (para devolver o foco ao WhatsApp).
     var onEditingEnded: (() -> Void)?
     /// Largura máxima (a janela informa ao mudar de tamanho): acima disso os nomes encolhem.
@@ -52,6 +54,15 @@ final class TabBarView: NSView {
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             heightAnchor.constraint(equalToConstant: 28),
         ])
+
+        // A barra de título fica com o clique direito antes de ele chegar à guia.
+        NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+            guard let self, event.window === self.window,
+                  let item = self.items.first(where: { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) })
+            else { return event }
+            item.rightMouseDown(with: event)
+            return nil
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -69,6 +80,7 @@ final class TabBarView: NSView {
                 item.onClose = { [weak self] in self?.onClose?(tab.id) }
                 item.onRename = { [weak self] name in self?.onRename?(tab.id, name) }
                 item.onResetSession = { [weak self] in self?.onResetSession?(tab.id) }
+                item.onToggleDisabled = { [weak self] in self?.onToggleDisabled?(tab.id) }
                 item.onEditingEnded = { [weak self] in self?.onEditingEnded?() }
                 stack.addArrangedSubview(item)
                 return item
@@ -113,6 +125,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
     var onClose: (() -> Void)?
     var onRename: ((String) -> Void)?
     var onResetSession: (() -> Void)?
+    var onToggleDisabled: (() -> Void)?
     var onEditingEnded: (() -> Void)?
 
     private let avatar = InitialBadgeView()
@@ -173,7 +186,10 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         if editingOriginal == nil { label.stringValue = tab.name }
         unreadBadge.count = tab.unread
         archivedBadge.count = tab.archived
+        avatar.alphaValue = tab.disabled ? 0.4 : 1
+        label.alphaValue = tab.disabled ? 0.4 : 1
         var tip = tab.name
+        if tab.disabled { tip += " · desativada" }
         if tab.unread > 0 { tip += " · \(tab.unread) não lida(s)" }
         if tab.archived > 0 { tip += " · \(tab.archived) arquivada(s)" }
         toolTip = tip + "\nDuplo clique para renomear"
@@ -234,11 +250,18 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// Chamado pelo monitor da TabBarView (o clique direito não chega até aqui sozinho).
+    override func rightMouseDown(with event: NSEvent) {
+        guard editingOriginal == nil, let menu = menu(for: event) else { return }
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
     override func menu(for event: NSEvent) -> NSMenu? {
         // Não seleciona a guia: trazê-la para a tela marcaria as mensagens como lidas.
         let menu = NSMenu()
         menu.addItem(withTitle: "Renomear guia", action: #selector(renameFromMenu), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Limpar sessão (novo QR code)…", action: #selector(resetFromMenu), keyEquivalent: "").target = self
+        menu.addItem(withTitle: tab.disabled ? "Ativar guia" : "Desativar guia", action: #selector(toggleDisabledFromMenu), keyEquivalent: "")
         menu.addItem(.separator())
         let close = menu.addItem(withTitle: "Fechar guia…", action: canClose ? #selector(closeTapped) : nil, keyEquivalent: "")
         close.target = self
@@ -295,6 +318,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
 
     @objc private func renameFromMenu() { beginEditing() }
     @objc private func resetFromMenu() { onResetSession?() }
+    @objc private func toggleDisabledFromMenu() { onToggleDisabled?() }
     @objc private func closeTapped() {
         onClose?()
         refreshHoverFromMouse()
