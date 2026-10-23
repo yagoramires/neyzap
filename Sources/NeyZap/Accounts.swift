@@ -7,6 +7,8 @@ struct Account: Codable, Equatable {
     var name: String
     /// nil nas guias salvas antes de existir o Instagram (= WhatsApp).
     var site: Site?
+    /// Guia desativada: continua logada, mas não carrega (sem processo nem RAM).
+    var disabled: Bool?
 }
 
 /// Lista de contas (números) persistida no UserDefaults. Cada conta tem um
@@ -47,6 +49,12 @@ final class AccountStore {
     func rename(_ id: UUID, to name: String) {
         guard let i = accounts.firstIndex(where: { $0.id == id }) else { return }
         accounts[i].name = name
+        save()
+    }
+
+    func setDisabled(_ id: UUID, _ disabled: Bool) {
+        guard let i = accounts.firstIndex(where: { $0.id == id }) else { return }
+        accounts[i].disabled = disabled ? true : nil
         save()
     }
 
