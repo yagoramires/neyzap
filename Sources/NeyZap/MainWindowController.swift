@@ -77,6 +77,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         selectedIndex = min(defaults.integer(forKey: "selectedAccount"), sessions.count - 1)
         if isPinned { window.level = .floating }
         layoutSessions()
+
+        let memoryCheck = Timer(timeInterval: 300, repeats: true) { [weak self] _ in
+            self?.sessions.forEach { $0.reloadIfOverMemory(minimumLimit: 1 << 30) }
+        }
+        memoryCheck.tolerance = 60
+        RunLoop.main.add(memoryCheck, forMode: .common)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -277,8 +283,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             webView.frame = parked.bounds
             webView.autoresizingMask = [.width, .height]
             webView.isHidden = false
+            if session.parkedAt == nil { session.parkedAt = Date() }
         }
-        for session in visible { session.webView.isHidden = false }
+        for session in visible {
+            session.webView.isHidden = false
+            session.parkedAt = nil
+        }
     }
 
     /// Cada conta visível precisa de pelo menos 340 px (320 com uma só).

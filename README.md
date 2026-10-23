@@ -49,6 +49,9 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
   mostrar/esconder, *Sempre na frente* (⌥⌘T), abrir ao iniciar sessão, downloads
   em `~/Downloads`. Fechar a janela (⌘W) não desliga: as mensagens continuam
   chegando.
+- **RAM sob controle** — o WhatsApp Web vai crescendo enquanto fica aberto; uma guia
+  escondida que passa de 1,5× o tamanho de recém-aberta (mínimo 1 GB) é recarregada
+  sozinha e volta ao normal. Guia em chamada não é tocada.
 - **Sessões que ficam** — feche e abra o app à vontade, as contas continuam logadas.
 - **Atualizações automáticas** — quando sai versão nova aqui no GitHub, o app baixa,
   confere a assinatura e se instala; é só escolher reiniciar agora ou depois.

@@ -88,6 +88,47 @@ final class AccountSession: NSObject {
         }
     }
 
+    /// Quando a conta foi para a janela invisível (nil = na tela).
+    var parkedAt: Date?
+    private var lastMemoryReload: Date?
+    private var loadedAt = Date()
+    /// RAM da página 10 min depois de carregada: contas com muitas conversas já abrem
+    /// com 1 GB, então o limite é relativo ao tamanho de recém-aberta de cada uma.
+    private var loadedFootprint: UInt64?
+
+    /// RAM do processo da página (o WhatsApp Web roda num processo do WebKit à parte).
+    var memoryFootprint: UInt64? {
+        guard let pid = webView.value(forKey: "_webProcessIdentifier") as? Int32, pid > 0 else { return nil }
+        var info = rusage_info_v4()
+        let ok = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V4, $0) }
+        } == 0
+        return ok ? info.ri_phys_footprint : nil
+    }
+
+    /// O WhatsApp Web só cresce enquanto aberto (conversas e mídia ficam na memória);
+    /// recarregar a conta escondida volta ao tamanho de recém-aberta. Fica de fora quem
+    /// está em chamada, acabou de sair da tela ou já foi recarregada na última hora.
+    func reloadIfOverMemory(minimumLimit: UInt64) {
+        guard let footprint = memoryFootprint else { return }
+        guard let loadedFootprint else {
+            if loadedAt.timeIntervalSinceNow < -600 {
+                self.loadedFootprint = footprint
+                Log.write("[\(name)] RAM depois de carregada: \(footprint >> 20) MB (recarrega escondida acima de \(max(minimumLimit, footprint / 2 * 3) >> 20) MB)")
+            }
+            return
+        }
+        let limit = max(minimumLimit, loadedFootprint / 2 * 3)
+        guard let parkedAt, parkedAt.timeIntervalSinceNow < -300,
+              lastMemoryReload.map({ $0.timeIntervalSinceNow < -3600 }) ?? true,
+              !webView.isLoading, webView.url != nil,
+              webView.microphoneCaptureState == .none, webView.cameraCaptureState == .none,
+              footprint > limit else { return }
+        lastMemoryReload = Date()
+        Log.write("[\(name)] escondida usando \(footprint >> 20) MB de RAM; recarregando para liberar")
+        webView.reload()
+    }
+
     func back() {
         webView.evaluateJavaScript("window.__neyzap && __neyzap.back()")
     }
@@ -285,7 +326,9 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        Log.write("[\(name)] página carregada")
+        loadedAt = Date()
+        loadedFootprint = nil
+        Log.write("[\(name)] página carregada (processo \(webView.value(forKey: "_webProcessIdentifier") ?? "?"))")
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
