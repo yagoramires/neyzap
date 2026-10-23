@@ -26,13 +26,17 @@ senha a cada build.
 ## Publicar uma versão
 
 1. Suba `CFBundleShortVersionString` **e** `CFBundleVersion` em `Resources/Info.plist`.
-2. `scripts/build.sh`, confira a assinatura (`codesign -dv build/NeyZap.app` deve
+2. `scripts/build.sh`, confira a assinatura (`codesign -dvv build/NeyZap.app` deve
    mostrar `Authority=NeyZap Local Signing`) e
    `ditto -c -k --keepParent build/NeyZap.app NeyZap-X.Y.Z.zip`.
-3. `gh release create vX.Y.Z NeyZap-X.Y.Z.zip` — quem estiver numa versão anterior
+3. `.dmg` para quem baixa na mão (janela de arrastar para Aplicativos):
+   `S=$(mktemp -d) && ditto build/NeyZap.app "$S/NeyZap.app" && ln -s /Applications "$S/Aplicativos"
+   && hdiutil create -volname NeyZap -srcfolder "$S" -format UDZO NeyZap-X.Y.Z.dmg`.
+4. `gh release create vX.Y.Z NeyZap-X.Y.Z.zip NeyZap-X.Y.Z.dmg` — quem estiver numa versão anterior
    recebe sozinho: o app baixa o zip, só aceita um NeyZap da versão do release
    assinado com o mesmo certificado (requisito de assinatura do app aberto), troca o
-   bundle e reinicia (ou instala ao fechar). O zip precisa conter `NeyZap.app` na raiz.
+   bundle e reinicia (ou instala ao fechar). O zip precisa conter `NeyZap.app` na raiz;
+   o atualizador usa só ele, o `.dmg` é para a primeira instalação.
 
 ## Tema
 

@@ -59,8 +59,8 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
 
 ## 📦 Instalação
 
-1. Baixe o `.zip` da [última versão](https://github.com/yagoramires/neyzap/releases/latest)
-   e arraste o **NeyZap.app** para **Aplicativos**.
+1. Baixe o `.dmg` da [última versão](https://github.com/yagoramires/neyzap/releases/latest),
+   abra e arraste o **NeyZap** para **Aplicativos**.
 2. Na primeira vez o macOS bloqueia o app, porque ele não é assinado por uma conta
    de desenvolvedor da Apple. Abra **Ajustes do Sistema → Privacidade e Segurança**,
    role até o aviso sobre o NeyZap e clique em **Abrir Mesmo Assim**. Se o macOS
