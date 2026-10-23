@@ -4,23 +4,23 @@
 
 # NeyZap
 
-**WhatsApp do seu jeito no Mac — nativo, leve e com várias contas.**
+**WhatsApp com uma UI decente no Mac — várias contas e o Instagram junto.**
 
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-111?logo=apple&logoColor=white)
 ![Swift](https://img.shields.io/badge/Swift-AppKit%20%2B%20WebKit-F05138?logo=swift&logoColor=white)
 ![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-F5B000)
 
+[**⬇️ Baixar a última versão**](https://github.com/yagoramires/neyzap/releases/latest)
+
 </div>
 
 ---
 
-O NeyZap é um app nativo de macOS que roda o **WhatsApp Web oficial** dentro de
-uma janela de verdade: uma guia para cada número, notificações com a foto do contato,
-layout que se adapta a qualquer tamanho de janela e integração com o Mac
-(Dock, atalhos, login automático).
+O NeyZap é uma alternativa ao app nativo de merda da Meta: um WhatsApp com uma UI
+decente, **várias contas** na mesma janela e **conexão com o Instagram**.
 
-Nada de cliente pirata nem automação: cada conta é o WhatsApp Web da própria
-Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
+Por baixo é o **WhatsApp Web oficial** numa janela de verdade do Mac — nada de cliente
+pirata nem automação. O risco para o seu número é o mesmo de usar o site no Safari.
 
 <div align="center">
 <img src="docs/notification.png" width="396" alt="Notificação do NeyZap com a foto do contato">
@@ -28,37 +28,50 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
 
 ## ✨ Recursos
 
-- **Guias como num navegador** — cada guia é um número de WhatsApp, com inicial
-  colorida, selo vermelho de não lidas e cinza de arquivadas. **+** (⌘T) abre outra
-  guia e mostra o QR para conectar mais um número; duplo clique renomeia; o **×**
-  fecha. As guias funcionam de forma independente: a que está fora da tela continua
-  recebendo e notificando, sem marcar nada como lido. Também dá para ver todas
-  **lado a lado** (⌘\\).
-- **Janela de qualquer tamanho** — abaixo de 760 px vira uma coluna por vez, como
-  no celular, com botão de voltar (⌘[). Painéis, emojis, fotos e prévias de envio
-  se ajustam à largura.
-- **Marcar como lida num clique** — nas conversas não lidas (inclusive nas
-  Arquivadas) aparece um ✓ à esquerda da foto: marca como lida sem abrir a conversa.
-- **Clique direito como no navegador** — abre o menu do WhatsApp (Reagir, Responder,
+### 👥 Várias contas
+
+- **Guias como num navegador** — uma guia por número, com inicial colorida, selo
+  vermelho de não lidas e cinza de arquivadas. **+** (⌘T) conecta outro número pelo
+  QR; duplo clique renomeia; **×** fecha.
+- **Contas independentes** — a guia fora da tela continua recebendo e notificando,
+  sem marcar nada como lido.
+- **Lado a lado** (⌘\\) — todas as contas visíveis ao mesmo tempo.
+- **Desativar guias** — clique direito na guia → *Desativar guia*: ela para de
+  carregar (zero RAM e CPU), mas continua logada; *Ativar* volta de onde estava.
+  Perfeito para o WhatsApp do trabalho no fim de semana.
+
+### 📸 Instagram
+
+- **Instagram numa guia** — no **+** escolha *Instagram* (ou ⇧⌘T): o site oficial,
+  com login próprio, ao lado das guias do WhatsApp. ⌘[ volta uma página.
+- **Sem vídeo tocando escondido** — pausa ao trocar de guia, fechar a janela ou
+  esconder o app.
+
+### 💬 Um WhatsApp melhor
+
+- **Janela de qualquer tamanho** — abaixo de 760 px vira uma coluna por vez, como no
+  celular, com botão de voltar (⌘[). Painéis, emojis, fotos e prévias se ajustam.
+- **Marcar como lida num clique** — o ✓ à esquerda da foto marca a conversa como lida
+  sem abrir (inclusive nas Arquivadas).
+- **Clique direito como no navegador** — o menu do WhatsApp (Reagir, Responder,
   Copiar…) em qualquer parte da mensagem, inclusive em cima do texto.
-- **Notificações com a foto do contato** — mostram o nome da guia em cima
-  do nome, abrem a conversa no clique e não somem com o mouse em cima.
-- **Mais limpo** — título NeyZap, sem Meta AI, sem propaganda do app oficial e sem barras
-  de rolagem.
-- **Integração com o Mac** — contador no Dock, atalho global **⌃⌥Z** para
-  mostrar/esconder, *Sempre na frente* (⌥⌘T), abrir ao iniciar sessão, downloads
-  em `~/Downloads`. Fechar a janela (⌘W) não desliga: as mensagens continuam
-  chegando.
-- **RAM sob controle** — o WhatsApp Web vai crescendo enquanto fica aberto; uma guia
-  escondida que passa de 1,5× o tamanho de recém-aberta (mínimo 1 GB) é recarregada
-  sozinha e volta ao normal. Guia em chamada não é tocada.
-- **Sessões que ficam** — feche e abra o app à vontade, as contas continuam logadas.
-- **Atualizações automáticas** — quando sai versão nova aqui no GitHub, o app baixa,
-  confere a assinatura e se instala; é só escolher reiniciar agora ou depois.
+- **Notificações com a foto do contato** — com o nome da guia, abrem a conversa no
+  clique e não somem com o mouse em cima.
+- **Mais limpo** — sem Meta AI, sem propaganda do app oficial, sem barras de rolagem.
 - **Tema próprio** — `NeyZap → Editar tema` abre um CSS que aplica ao salvar.
-- **Instagram numa guia** — no **+** escolha *Instagram* (ou ⇧⌘T): o site oficial do
-  Instagram, com login próprio, ao lado das guias do WhatsApp. O vídeo pausa ao trocar
-  de guia, fechar a janela ou esconder o app.
+
+### 🍎 Feito para o Mac
+
+- **Integração** — contador no Dock, atalho global **⌃⌥Z**, *Sempre na frente*,
+  abrir ao iniciar sessão, downloads em `~/Downloads`. Fechar a janela (⌘W) não
+  desliga: as mensagens continuam chegando.
+- **RAM sob controle** — guia escondida que passa de 1,5× o tamanho de recém-aberta
+  (mínimo 1 GB) é recarregada sozinha. Guia em chamada não é tocada.
+- **Sessões que ficam** — feche e abra o app à vontade, as contas continuam logadas.
+  Uma guia de WhatsApp desativada há 7 dias conecta escondida por 15 min, para o
+  aparelho não ser desconectado por inatividade.
+- **Atualizações automáticas** — o app baixa a versão nova daqui do GitHub, confere a
+  assinatura e se instala; é só escolher reiniciar agora ou depois.
 
 ## 📦 Instalação
 
@@ -81,10 +94,11 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
 | --- | --- |
 | ⌃⌥Z | Mostrar/esconder o NeyZap de qualquer lugar |
 | ⌘1 … ⌘9 | Trocar de guia |
+| ⌘T | Nova guia de WhatsApp (conectar outro número) |
+| ⇧⌘T | Nova guia do Instagram |
 | ⌘\\ | Guias lado a lado |
-| ⌘[ | Voltar para a lista (janela estreita) |
+| ⌘[ | Voltar (lista de conversas / página anterior no Instagram) |
 | ⌥⌘T | Sempre na frente |
-| ⌘T | Nova guia (conectar outro número) |
 | ⌘+ / ⌘− / ⌘0 | Zoom |
 | ⌘R | Recarregar a guia |
 | ⌘, | Editar tema (CSS) |
@@ -99,9 +113,11 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
   **Sincronização em segundo plano** nas configurações (com a conta fora da tela) —
   preferências locais deste Mac. O ✓ de marcar como lida só age quando você clica
   nele, escolhendo "Marcar como lida" no menu da própria conversa.
+- As guias do Instagram são o site puro: nada é injetado nelas.
 - Tudo fica no seu Mac: sessões em armazenamentos separados por conta, nada é
-  enviado para servidores além do próprio WhatsApp. A verificação de atualização
-  só consulta a lista de versões deste repositório e baixa o zip publicado aqui.
+  enviado para servidores além do próprio WhatsApp/Instagram. A verificação de
+  atualização só consulta a lista de versões deste repositório e baixa o zip
+  publicado aqui.
 - A chave que protege as sessões fica num arquivo que só o seu usuário lê
   (`~/Library/Application Support/NeyZap/webcrypto.key`), e não no Chaveiro: sem
   conta de desenvolvedor da Apple, o Chaveiro pediria a senha a cada atualização do
@@ -114,12 +130,12 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
 - Para desenvolvimento existe um canal de depuração pelo terminal capaz de rodar
   código nas guias abertas. Ele vem **desligado** e, mesmo ligado, só aceita
   comandos com uma senha nova a cada abertura, guardada num arquivo que só o seu
-  usuário lê
-  (veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md)).
+  usuário lê (veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md)).
 
 ## ⚠️ Limitações
 
 - Chamadas de voz e vídeo seguem o que o WhatsApp Web oferece.
+- O Instagram não notifica nem entra no contador do Dock.
 - As notificações com foto são desenhadas pelo próprio app (o macOS só permite
   trocar o ícone pela foto em apps de desenvolvedor pago), então não ficam na
   Central de Notificações nem respeitam o modo Foco. Prefere as do sistema?
@@ -127,4 +143,4 @@ Para compilar a partir do código, veja [docs/DESENVOLVIMENTO.md](docs/DESENVOLV
 
 ---
 
-<sub>Projeto pessoal, sem vínculo com o WhatsApp ou a Meta. WhatsApp e o logotipo do WhatsApp são marcas registradas da Meta Platforms, Inc. O ícone do app (`Resources/AppIcon.icns`, `design/`, `docs/icon.png`) é derivado desse logotipo e **não** faz parte da licença MIT do código.</sub>
+<sub>Projeto pessoal, sem vínculo com o WhatsApp, o Instagram ou a Meta. WhatsApp, Instagram e seus logotipos são marcas registradas da Meta Platforms, Inc. O ícone do app (`Resources/AppIcon.icns`, `design/`, `docs/icon.png`) é derivado do logotipo do WhatsApp e **não** faz parte da licença MIT do código.</sub>
