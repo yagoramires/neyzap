@@ -1,10 +1,9 @@
 import AppKit
 import WebKit
 
-/// Uma conta do WhatsApp: uma WKWebView com armazenamento próprio carregando o
-/// WhatsApp Web oficial.
+/// Uma conta do WhatsApp (ou do Instagram): uma WKWebView com armazenamento
+/// próprio carregando o site oficial.
 final class AccountSession: NSObject {
-    static let home = URL(string: "https://web.whatsapp.com/")!
     static var baseCSS = BundledResource.text("layout", "css")
     static var injectJS = BundledResource.text("inject", "js")
 
@@ -18,6 +17,9 @@ final class AccountSession: NSObject {
     let accountID: UUID
     var name: String
     let webView: WKWebView
+    /// Guia do Instagram: o site puro, sem nada do inject.js/layout.css (que são do WhatsApp).
+    let isInstagram: Bool
+    let home: URL
 
     var onUnreadChange: (() -> Void)?
     private(set) var unread = 0 {
@@ -37,6 +39,8 @@ final class AccountSession: NSObject {
     init(account: Account) {
         accountID = account.id
         name = account.name
+        isInstagram = account.site == .instagram
+        home = URL(string: isInstagram ? "https://www.instagram.com/" : "https://web.whatsapp.com/")!
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore(forIdentifier: account.id)
@@ -48,7 +52,10 @@ final class AccountSession: NSObject {
         // e notificam, quando a aba volta. Os temporizadores da página escondida
         // continuam desacelerados (economia de bateria); as mensagens chegam pela
         // conexão de rede, que não depende deles.
-        Self.setPrivatePreference(config.preferences, "_setPageVisibilityBasedProcessSuppressionEnabled:", false)
+        // O Instagram não precisa: escondido pode ser suspenso (economiza bateria).
+        if !isInstagram {
+            Self.setPrivatePreference(config.preferences, "_setPageVisibilityBasedProcessSuppressionEnabled:", false)
+        }
         webView = WKWebView(frame: .zero, configuration: config)
 
         super.init()
@@ -61,12 +68,14 @@ final class AccountSession: NSObject {
         webView.isInspectable = true
         webView.pageZoom = CGFloat(UserDefaults.standard.object(forKey: "zoom") as? Double ?? 1)
 
-        titleObservation = webView.observe(\.title, options: [.initial, .new]) { [weak self] webView, _ in
-            self?.updateUnread(from: webView.title)
+        if !isInstagram {
+            titleObservation = webView.observe(\.title, options: [.initial, .new]) { [weak self] webView, _ in
+                self?.updateUnread(from: webView.title)
+            }
         }
 
-        Log.write("[\(account.name)] carregando WhatsApp Web")
-        webView.load(URLRequest(url: Self.home))
+        Log.write("[\(account.name)] carregando \(home.host ?? "")")
+        webView.load(URLRequest(url: home))
     }
 
     deinit {
@@ -77,14 +86,15 @@ final class AccountSession: NSObject {
     // MARK: - Ações vindas do app
 
     func reload() {
-        if webView.url == nil { webView.load(URLRequest(url: Self.home)) } else { webView.reload() }
+        if webView.url == nil { webView.load(URLRequest(url: home)) } else { webView.reload() }
     }
 
     /// Apaga os dados do WhatsApp Web desta conta e volta para o QR code.
     func resetSession() {
         let store = webView.configuration.websiteDataStore
         store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) { [weak self] in
-            self?.webView.load(URLRequest(url: Self.home))
+            guard let self else { return }
+            self.webView.load(URLRequest(url: self.home))
         }
     }
 
@@ -130,6 +140,7 @@ final class AccountSession: NSObject {
     }
 
     func back() {
+        if isInstagram { webView.goBack(); return }
         webView.evaluateJavaScript("window.__neyzap && __neyzap.back()")
     }
 
@@ -163,6 +174,7 @@ final class AccountSession: NSObject {
     private func installUserScripts(userCSS: String) {
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
+        if isInstagram { return }
         // Depuração: abre o WhatsApp Web puro, sem nada injetado.
         if UserDefaults.standard.bool(forKey: "debugNoInject") { return }
         let bgSyncCheckedAt = Int((UserDefaults.standard.object(forKey: "bgSyncCheckedAt-\(accountID.uuidString)") as? Date)?.timeIntervalSince1970 ?? 0) * 1000
@@ -286,8 +298,8 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
             return
         }
         if isMainFrame {
-            // A guia só mostra o WhatsApp Web; FAQ, site e qualquer outro link abrem no navegador.
-            if scheme == "https" && url.host?.lowercased() == "web.whatsapp.com" || url.absoluteString == "about:blank" {
+            // A guia só mostra o próprio site; FAQ e qualquer outro link abrem no navegador.
+            if scheme == "https" && isOwnHost(url.host) || url.absoluteString == "about:blank" {
                 decisionHandler(.allow)
             } else {
                 if isWeb { NSWorkspace.shared.open(url) }
@@ -311,6 +323,13 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
 
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         download.delegate = self
+    }
+
+    /// Instagram inclui o login pelo Facebook, que redireciona a guia para facebook.com.
+    private func isOwnHost(_ host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        guard isInstagram else { return host == "web.whatsapp.com" }
+        return ["instagram.com", "facebook.com"].contains { host == $0 || host.hasSuffix(".\($0)") }
     }
 
     // Delegates privados do WebKit: o app entrega a chave mestra do WebCrypto em vez

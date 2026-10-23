@@ -58,7 +58,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         splitView.frame = window.contentView!.bounds
 
         tabBar.onSelect = { [weak self] id in self?.selectTab(id) }
-        tabBar.onAdd = { [weak self] in self?.newTab() }
+        tabBar.onAdd = { [weak self] site in self?.newTab(site: site) }
         tabBar.onRename = { [weak self] id, name in self?.rename(accountID: id, to: name) }
         tabBar.onClose = { [weak self] id in self?.confirmClose(accountID: id) }
         tabBar.onResetSession = { [weak self] id in self?.confirmReset(accountID: id) }
@@ -83,6 +83,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         }
         memoryCheck.tolerance = 60
         RunLoop.main.add(memoryCheck, forMode: .common)
+        NotificationCenter.default.addObserver(forName: NSApplication.didHideNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.pauseInstagram()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -109,12 +112,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         if let i = sessions.firstIndex(where: { $0.accountID == accountID }) { select(index: i) }
     }
 
-    /// Guia nova: conecta outro número (mostra o QR); o nome dá para trocar depois.
-    func newTab() {
+    /// Guia nova: conecta outro número (mostra o QR) ou abre o Instagram; o nome dá para trocar depois.
+    func newTab(site: Account.Site = .whatsapp) {
+        let base = site == .instagram ? "Instagram" : "WhatsApp"
         let taken = Set(sessions.map(\.name))
-        var n = sessions.count + 1
-        while taken.contains("WhatsApp \(n)") { n += 1 }
-        sessions.append(makeSession(AccountStore.shared.add(name: "WhatsApp \(n)")))
+        var name = base, n = 1
+        while taken.contains(name) { n += 1; name = "\(base) \(n)" }
+        sessions.append(makeSession(AccountStore.shared.add(name: name, site: site)))
         select(index: sessions.count - 1)
         onAccountsChange?()
     }
@@ -138,7 +142,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         guard sessions.count > 1, let session = sessions.first(where: { $0.accountID == accountID }) else { return }
         let ok = Dialogs.confirm(
             title: "Fechar a guia “\(session.name)”?",
-            message: "A sessão do WhatsApp Web desta guia será apagada deste Mac. Lembre de desconectar o aparelho também no celular (Aparelhos conectados).",
+            message: session.isInstagram
+                ? "O login do Instagram desta guia será apagado deste Mac."
+                : "A sessão do WhatsApp Web desta guia será apagada deste Mac. Lembre de desconectar o aparelho também no celular (Aparelhos conectados).",
             confirm: "Fechar guia",
             destructive: true
         )
@@ -149,7 +155,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         guard let session = sessions.first(where: { $0.accountID == accountID }) else { return }
         let ok = Dialogs.confirm(
             title: "Limpar a sessão de “\(session.name)”?",
-            message: "Os dados do WhatsApp Web desta guia serão apagados deste Mac e o QR code aparecerá de novo. Desconecte o aparelho antigo no celular (Aparelhos conectados).",
+            message: session.isInstagram
+                ? "Os dados do Instagram desta guia serão apagados deste Mac e será preciso entrar de novo."
+                : "Os dados do WhatsApp Web desta guia serão apagados deste Mac e o QR code aparecerá de novo. Desconecte o aparelho antigo no celular (Aparelhos conectados).",
             confirm: "Limpar",
             destructive: true
         )
@@ -283,7 +291,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             webView.frame = parked.bounds
             webView.autoresizingMask = [.width, .height]
             webView.isHidden = false
-            if session.parkedAt == nil { session.parkedAt = Date() }
+            if session.parkedAt == nil {
+                session.parkedAt = Date()
+                // Reel saindo da tela não continua tocando no fundo.
+                if session.isInstagram { webView.pauseAllMediaPlayback() }
+            }
         }
         for session in visible {
             session.webView.isHidden = false
@@ -398,6 +410,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
+        pauseInstagram()
         return false
+    }
+
+    /// Janela fechada ou app escondido: os reels param de tocar.
+    private func pauseInstagram() {
+        sessions.filter(\.isInstagram).forEach { $0.webView.pauseAllMediaPlayback() }
     }
 }

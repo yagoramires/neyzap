@@ -240,6 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menu.addItem(.separator())
         if menu === accountsMenu {
             menu.addItem(item("Nova guia", #selector(addAccount), "t"))
+            menu.addItem(item("Nova guia do Instagram", #selector(addInstagram), "T"))
             menu.addItem(item("Renomear guia…", #selector(renameAccount), ""))
             menu.addItem(item("Fechar guia…", #selector(removeAccount), ""))
             menu.addItem(.separator())
@@ -280,6 +281,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     @objc private func addAccount() {
         windowController.newTab()
+        showWindow()
+    }
+    @objc private func addInstagram() {
+        windowController.newTab(site: .instagram)
         showWindow()
     }
     @objc private func renameAccount() { windowController.promptRename(accountID: windowController.activeSession.accountID) }

@@ -56,6 +56,9 @@ Meta, então o risco para o seu número é o mesmo de usar o site no Safari.
 - **Atualizações automáticas** — quando sai versão nova aqui no GitHub, o app baixa,
   confere a assinatura e se instala; é só escolher reiniciar agora ou depois.
 - **Tema próprio** — `NeyZap → Editar tema` abre um CSS que aplica ao salvar.
+- **Instagram numa guia** — no **+** escolha *Instagram* (ou ⇧⌘T): o site oficial do
+  Instagram, com login próprio, ao lado das guias do WhatsApp. O vídeo pausa ao trocar
+  de guia, fechar a janela ou esconder o app.
 
 ## 📦 Instalação
 
