@@ -170,6 +170,49 @@ html[data-nz-compact] #expressions-panel-container [role="application"] {
   bottom: calc(78px / var(--nz-expr-zoom, 1)) !important;
 }
 
+/* Mídia de todas as conversas (botão Mídia do trilho): o WhatsApp fixa 748 px no
+   diálogo e 700 px no conteúdo, que saem da janela quando ela é mais estreita. */
+[role="dialog"]:has(> [data-testid="media-hub-modal"]) {
+  min-width: 0 !important;
+  width: min(748px, calc(100vw - 24px)) !important;
+}
+
+[data-testid="media-hub-modal"] {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+[data-testid="media-hub-modal"] [role="tab"] span {
+  white-space: nowrap !important;
+}
+
+/* Estreito: título e ícones numa linha, abas na de baixo (abaixo de ~700 px as
+   abas encostam nos ícones). */
+@media (max-width: 699px) {
+  [data-testid="media-hub-modal"] div:has(> div > [role="tablist"]) {
+    flex-wrap: wrap !important;
+    height: auto !important;
+  }
+  [data-testid="media-hub-modal"] div:has(> div > [role="tablist"]) > div:first-child {
+    flex: 1 1 0 !important;
+  }
+  [data-testid="media-hub-modal"] div:has(> div > [role="tablist"]) > div:last-child {
+    flex: 0 0 auto !important;
+    width: auto !important;
+  }
+  [data-testid="media-hub-modal"] div:has(> [role="tablist"]) {
+    order: 1 !important;
+    flex: 1 0 100% !important;
+  }
+}
+
+@media (max-width: 559px) {
+  [data-testid="media-hub-modal"] div:has(> div > [role="tablist"]) > div:first-child span + span {
+    display: none !important;
+  }
+}
+
 /* ---------- Cabeçalho da conversa em larguras pequenas ---------- */
 
 @media (max-width: 559px) {
@@ -282,6 +325,11 @@ html[data-nz-marking] div:has(> div > div > div > [role="menu"]) {
 /* ---------- Tema Grafite do NeyHub ----------
    Só troca os tokens de cor do próprio WhatsApp (--WDS-*), no tema escuro dele: os
    componentes continuam se desenhando sozinhos, sem regra em cima das classes. */
+
+/* Fundo da conversa liso, sem o papel de parede de desenhos. */
+#main [data-testid^="conversation-background"] {
+  display: none !important;
+}
 
 body.dark {
   --WDS-surface-default: #121315 !important;
