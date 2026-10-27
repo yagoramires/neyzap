@@ -2,6 +2,25 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [0.4.0] - 2026-10-27
+
+### Alterado
+- Visual no tema Grafite do NeyHub: fundo grafite, destaque verde-limão, balões, lista, menus e botões nas mesmas cores, e ícone novo.
+- Logo "neyzap" na lista, com o "zap" em limão.
+- Guias no mesmo tema: a guia aberta fica com a inicial em limão, e o selo de não lidas também é limão.
+- Janela estreita: quando os nomes não cabem, as guias de trás ficam só com a inicial (nenhuma guia some mais para o menu »).
+- Botão ✓ de marcar como lida com mais espaço até a foto e limão ao passar o mouse.
+- Fundo da conversa liso, sem o papel de parede de desenhos.
+- Conversa estreita (inclusive com a lista aberta ao lado): as mensagens usam a largura toda, sem o respiro de ~60 px de cada lado.
+
+### Removido
+- Botões de Status e Comunidades no trilho, sugestões de canais ("Encontrar canais para seguir") e, na tela sem conversa aberta, o cartão da App Store e o atalho da Meta AI.
+
+### Corrigido
+- O canto do balão no hover (atrás da setinha) ficava com o verde antigo do WhatsApp.
+- O painel **Mídia** (mídias de todas as conversas) cabe na janela estreita, com as abas numa linha própria.
+- Página do WhatsApp travada (sem responder por 30 s, com o processo carregando para sempre) é reiniciada sozinha.
+
 ## [0.3.1] - 2026-10-23
 
 ### Adicionado
