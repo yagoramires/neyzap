@@ -274,6 +274,11 @@
       delete root.dataset.nzDrawerOver;
     }
 
+    // Coluna da conversa estreita (janela estreita ou lista larga ao lado): o CSS tira
+    // o respiro de ~60 px que o WhatsApp deixa de cada lado das mensagens.
+    if (mainPane && mainPane.getBoundingClientRect().width < 600) root.dataset.nzNarrowChat = '';
+    else delete root.dataset.nzNarrowChat;
+
     for (let a = panes.parentElement; a && a !== document.body; a = a.parentElement) {
       if (!a.hasAttribute('data-nz-anc')) a.setAttribute('data-nz-anc', '');
     }

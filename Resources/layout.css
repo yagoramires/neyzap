@@ -230,16 +230,16 @@ html[data-nz-compact] #expressions-panel-container [role="application"] {
 
 /* ---------- Mensagens em larguras pequenas ---------- */
 
-@media (max-width: 559px) {
-  /* As linhas de mensagem têm ~60 px de respiro de cada lado e os balões de mídia
-     têm 336 px fixos: numa coluna estreita eles saem da tela. */
-  #main :has(> [data-testid="msg-container"]) {
-    padding-left: 10px !important;
-    padding-right: 10px !important;
-  }
-  #main [data-testid="msg-container"] {
-    max-width: 88% !important;
-  }
+/* As linhas de mensagem têm ~60 px de respiro de cada lado e os balões de mídia
+   têm 336 px fixos: numa coluna estreita (html[data-nz-narrow-chat], medida da
+   coluna pelo inject.js, não da janela) eles saem da tela. */
+html[data-nz-narrow-chat] #main :has(> [data-testid="msg-container"]) {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+html[data-nz-narrow-chat] #main [data-testid="msg-container"] {
+  max-width: 88% !important;
 }
 
 @media (max-width: 399px) {
@@ -374,6 +374,22 @@ body.dark {
   --WDS-lines-divider: #24262a !important;
   --WDS-lines-outline-deemphasized: #25272c !important;
   --WDS-lines-outline-default: #33363c !important;
+
+  /* As mesmas cores em "r, g, b", usadas nos gradientes (atrás da setinha do balão
+     no hover) e nas transparências. */
+  --WDS-accent-RGB: 198, 255, 61 !important;
+  --WDS-persistent-always-branded-RGB: 198, 255, 61 !important;
+  --WDS-content-on-accent-RGB: 17, 17, 17 !important;
+  --WDS-content-default-RGB: 216, 217, 220 !important;
+  --WDS-systems-bubble-surface-outgoing-RGB: 36, 48, 20 !important;
+  --WDS-systems-bubble-surface-incoming-RGB: 31, 33, 37 !important;
+  --WDS-surface-default-RGB: 18, 19, 21 !important;
+  --WDS-background-wash-plain-RGB: 18, 19, 21 !important;
+  --WDS-background-wash-inset-RGB: 18, 19, 21 !important;
+  --WDS-systems-chat-background-wallpaper-RGB: 18, 19, 21 !important;
+  --WDS-surface-emphasized-RGB: 23, 24, 27 !important;
+  --WDS-surface-elevated-default-RGB: 26, 27, 31 !important;
+  --WDS-lines-outline-default-RGB: 51, 54, 60 !important;
 
   /* Nomes antigos que alguns painéis (emojis, menus, mídia) ainda usam. */
   --app-background: #121315 !important;
