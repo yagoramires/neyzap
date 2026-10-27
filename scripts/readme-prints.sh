@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Gera os prints do README (docs/window.png e docs/compact.png) a partir de
+# Gera os prints do README (docs/<tela>.png) a partir de
 # design/readme-ui.html, uma réplica da janela com dados inventados: nunca use
 # capturas da janela de verdade, que mostram conversas reais.
 set -euo pipefail
@@ -13,3 +13,7 @@ shot() { # view largura altura saída (largura/altura = janela + 2×28 px de mar
 }
 shot wide 1236 816 docs/window.png
 shot compact 476 796 docs/compact.png
+shot chat 476 796 docs/chat.png
+shot split 1236 756 docs/split.png
+shot read 516 518 docs/read.png
+shot menu 616 306 docs/menu.png

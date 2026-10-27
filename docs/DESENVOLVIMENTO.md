@@ -25,7 +25,7 @@ senha a cada build.
 
 ## Prints do README
 
-`scripts/readme-prints.sh` gera `docs/window.png` e `docs/compact.png` a partir de
+`scripts/readme-prints.sh` gera os prints do README (`docs/window.png`, `compact.png`, `chat.png`, `split.png`, `read.png` e `menu.png`) a partir de
 `design/readme-ui.html`, uma réplica da janela com contatos e mensagens inventados
 (precisa do Google Chrome). Nunca use capturas da janela de verdade: elas mostram
 conversas reais. Se a UI mudar, ajuste a réplica e rode o script de novo.
