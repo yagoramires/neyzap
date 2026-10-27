@@ -343,6 +343,9 @@
   // Mensagens e prévias de conversa nunca são tocadas.
   // ---------------------------------------------------------------------------
   const PROMO = /(baixe|baixar|download|get)\b.{0,30}whatsapp.{0,20}\b(para|for)\s+(mac|windows)/i;
+  // Tela vazia (nenhuma conversa aberta): cartão da App Store e atalho da Meta AI.
+  // O texto dos botões vem com o nome do ícone na frente ("wds-ic-logo-meta-ai-colorPerguntar à Meta AI").
+  const EMPTY_PROMO = /(app store|meta ai)$/i;
   let promoTimer = 0;
 
   function schedulePromoScan() {
@@ -497,7 +500,7 @@
   function hidePromos() {
     // Marcações que não batem mais (o WhatsApp reaproveita elementos) são desfeitas.
     document.querySelectorAll('[data-nz-hide]').forEach((el) => {
-      if (!PROMO.test(el.textContent)) el.removeAttribute('data-nz-hide');
+      if (!PROMO.test(el.textContent) && !EMPTY_PROMO.test(el.textContent.trim())) el.removeAttribute('data-nz-hide');
     });
     const tooBig = (el) => el.textContent.length > 150 || !!el.querySelector('#pane-side, [role="row"], [role="listitem"]');
     const roots = [document.querySelector('[data-nz="side"]'), document.querySelector('[data-nz="main"]')].filter(Boolean);
@@ -515,6 +518,16 @@
         // Sobe enquanto o pai ainda for só o banner (texto curto, caixa baixa).
         while (el.parentElement && el.parentElement !== r && !tooBig(el.parentElement)
           && el.parentElement.textContent.length < 120 && el.parentElement.getBoundingClientRect().height < 120) el = el.parentElement;
+        el.setAttribute('data-nz-hide', '');
+      }
+    }
+    const main = document.querySelector('[data-nz="main"]');
+    if (main && !main.querySelector('#main')) {
+      for (const b of main.querySelectorAll('button')) {
+        if (!EMPTY_PROMO.test(b.textContent.trim())) continue;
+        // Sobe até o cartão inteiro (ilustração + botão), parando antes dos outros atalhos.
+        let el = b;
+        while (el.parentElement && el.parentElement !== main && el.parentElement.querySelectorAll('button').length === 1) el = el.parentElement;
         el.setAttribute('data-nz-hide', '');
       }
     }

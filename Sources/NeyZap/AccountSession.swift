@@ -122,8 +122,12 @@ final class AccountSession: NSObject {
     private var loadedFootprint: UInt64?
 
     /// RAM do processo da página (o WhatsApp Web roda num processo do WebKit à parte).
+    private var webProcessID: Int32? {
+        (webView.value(forKey: "_webProcessIdentifier") as? Int32).flatMap { $0 > 0 ? $0 : nil }
+    }
+
     var memoryFootprint: UInt64? {
-        guard let pid = webView.value(forKey: "_webProcessIdentifier") as? Int32, pid > 0 else { return nil }
+        guard let pid = webProcessID else { return nil }
         var info = rusage_info_v4()
         let ok = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V4, $0) }
@@ -152,6 +156,21 @@ final class AccountSession: NSObject {
         lastMemoryReload = Date()
         Log.write("[\(name)] escondida usando \(footprint >> 20) MB de RAM; recarregando para liberar")
         webView.reload()
+    }
+
+    /// O WhatsApp Web às vezes entra num loop infinito de promessas ainda carregando
+    /// (100% de CPU, GBs de RAM, isLoading eterno). Página que não responde a um JS
+    /// trivial em 30 s tem o processo encerrado; webViewWebContentProcessDidTerminate recarrega.
+    func killIfHung() {
+        guard let pid = webProcessID,
+              webView.microphoneCaptureState == .none, webView.cameraCaptureState == .none else { return }
+        var answered = false
+        webView.evaluateJavaScript("1") { _, _ in answered = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+            guard let self, !answered, self.webProcessID == pid else { return }
+            Log.write("[\(self.name)] página sem responder há 30 s (\((self.memoryFootprint ?? 0) >> 20) MB); encerrando o processo para recarregar")
+            kill(pid, SIGKILL)
+        }
     }
 
     func back() {

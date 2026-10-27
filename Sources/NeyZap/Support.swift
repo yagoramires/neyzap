@@ -97,3 +97,20 @@ enum Dialogs {
         return alert.runModal() == .alertFirstButtonReturn
     }
 }
+
+/// Cores do tema Grafite do NeyHub (as mesmas do NeyKit).
+enum Grafite {
+    static let bg = hex(0x121315)
+    static let sidebar = hex(0x17181b)
+    static let selected = hex(0x22242a)
+    static let ghostBorder = hex(0x33363c)
+    static let ghostText = hex(0x9a9ca3)
+    static let muted = hex(0x6e7179)
+    static let text = hex(0xd8d9dc)
+    static let accent = hex(0xc6ff3d)
+    static let onAccent = hex(0x111111)
+
+    private static func hex(_ v: Int) -> NSColor {
+        NSColor(srgbRed: CGFloat(v >> 16 & 255) / 255, green: CGFloat(v >> 8 & 255) / 255, blue: CGFloat(v & 255) / 255, alpha: 1)
+    }
+}

@@ -42,6 +42,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         )
         window.title = "NeyZap"
         window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = Grafite.sidebar
         window.minSize = NSSize(width: 320, height: 420)
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
@@ -80,7 +82,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         layoutSessions()
 
         let memoryCheck = Timer(timeInterval: 300, repeats: true) { [weak self] _ in
-            self?.sessions.forEach { $0.reloadIfOverMemory(minimumLimit: 1 << 30) }
+            self?.sessions.forEach {
+                $0.killIfHung()
+                $0.reloadIfOverMemory(minimumLimit: 1 << 30)
+            }
             self?.keepDisabledLinked()
         }
         memoryCheck.tolerance = 60

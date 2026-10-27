@@ -1,6 +1,6 @@
 /*
- * NeyZap — CSS base (layout responsivo). O tema visual fica no user.css, que é
- * carregado depois deste arquivo e recarregado ao salvar.
+ * NeyZap — CSS base (layout responsivo + tema Grafite do NeyHub). O user.css é
+ * carregado depois deste arquivo e pode sobrescrever a camada visual.
  *
  * Atributos marcados pelo inject.js:
  *   html[data-nz-compact]           janela estreita (< 760 px): uma coluna por vez
@@ -30,9 +30,10 @@
 
 /* ---------- Coisas removidas ---------- */
 
-/* Meta AI (botão no trilho e onde mais aparecer) e a divisória que sobraria. */
+/* Meta AI (botão no trilho e onde mais aparecer) e a divisória que sobraria;
+   Status e Comunidades no trilho. */
 button[aria-label="Meta AI"],
-[data-nz="left"] div:has(> span button[aria-label="Meta AI"]),
+[data-nz="left"] div:has(> span button:is([aria-label="Meta AI"], [aria-label="Status"], [aria-label="Comunidades"])),
 [data-nz="left"] hr:has(+ div:last-child button[aria-label="Meta AI"]) {
   display: none !important;
 }
@@ -42,11 +43,19 @@ button[aria-label="Meta AI"],
   display: none !important;
 }
 
+[data-icon="wa-wordmark"]::before,
 [data-icon="wa-wordmark"]::after {
-  content: "NeyZap";
   font: 700 22px/28px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
   letter-spacing: -0.3px;
   color: currentColor;
+}
+
+[data-icon="wa-wordmark"]::before { content: "ney"; }
+[data-icon="wa-wordmark"]::after { content: "zap"; color: var(--WDS-accent); }
+
+/* Sugestões de canais ("Encontrar canais para seguir" + "Descobrir mais"). */
+[data-testid="newsletter-recommended-unit"] {
+  display: none !important;
 }
 
 /* Propaganda do app para Mac/Windows (marcada pelo inject.js). */
@@ -227,7 +236,7 @@ html[data-nz-compact] #expressions-panel-container [role="application"] {
 
 /* Espaço à esquerda da foto nas conversas não lidas, onde fica o botão. */
 :is(#pane-side, [data-testid="archived-chatlist"]) :is([role="row"], [role="listitem"]):has(span[aria-label*="não lida" i], span[aria-label*="nao lida" i], span[aria-label*="unread" i]) [data-testid="cell-frame-container"] {
-  padding-left: 22px !important;
+  padding-left: 32px !important;
 }
 
 [data-testid="cell-frame-container"]:has(> .nz-read) {
@@ -236,7 +245,7 @@ html[data-nz-compact] #expressions-panel-container [role="application"] {
 
 .nz-read {
   position: absolute;
-  left: 1px;
+  left: 4px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 1;
@@ -255,8 +264,8 @@ html[data-nz-compact] #expressions-panel-container [role="application"] {
 
 .nz-read:hover {
   opacity: 1;
-  color: #fff;
-  background: #21c063;
+  color: var(--WDS-content-on-accent, #fff);
+  background: var(--WDS-accent, #21c063);
 }
 
 .nz-read:disabled {
@@ -268,4 +277,63 @@ html[data-nz-compact] #expressions-panel-container [role="application"] {
 html[data-nz-marking] [role="menu"],
 html[data-nz-marking] div:has(> div > div > div > [role="menu"]) {
   opacity: 0 !important;
+}
+
+/* ---------- Tema Grafite do NeyHub ----------
+   Só troca os tokens de cor do próprio WhatsApp (--WDS-*), no tema escuro dele: os
+   componentes continuam se desenhando sozinhos, sem regra em cima das classes. */
+
+body.dark {
+  --WDS-surface-default: #121315 !important;
+  --WDS-background-wash-plain: #121315 !important;
+  --WDS-background-wash-inset: #121315 !important;
+  --WDS-systems-chat-surface-tray: #121315 !important;
+  --WDS-surface-emphasized: #17181b !important;
+  --WDS-components-surface-nav-bar: #17181b !important;
+  --WDS-background-elevated-wash-plain: #17181b !important;
+  --WDS-background-elevated-wash-inset: #17181b !important;
+  --WDS-surface-elevated-default: #1a1b1f !important;
+  --WDS-surface-elevated-emphasized: #22242a !important;
+  --WDS-surface-highlight: rgba(255, 255, 255, .05) !important;
+  --WDS-surface-pressed: #24262a !important;
+  --WDS-components-active-list-row: #22242a !important;
+  --WDS-systems-chat-surface-composer: #1a1b1f !important;
+
+  --WDS-systems-bubble-surface-incoming: #1f2125 !important;
+  --WDS-systems-bubble-surface-outgoing: #243014 !important;
+  --WDS-systems-bubble-surface-system: #1a1b1f !important;
+  --WDS-systems-bubble-surface-e2e: #1a1b1f !important;
+  --WDS-systems-bubble-surface-business: #1a1b1f !important;
+
+  --WDS-content-default: #d8d9dc !important;
+  --WDS-content-action-default: #d8d9dc !important;
+  --WDS-content-deemphasized: #9a9ca3 !important;
+  --WDS-systems-bubble-content-deemphasized: #9a9ca3 !important;
+  --WDS-content-disabled: #4a4d54 !important;
+  --WDS-content-on-accent: #111111 !important;
+
+  --WDS-accent: #c6ff3d !important;
+  --WDS-accent-deemphasized: #1c2410 !important;
+  --WDS-accent-emphasized: #e3ff9e !important;
+  --WDS-content-action-emphasized: #c6ff3d !important;
+  --WDS-content-external-link: #c6ff3d !important;
+  --WDS-content-read: #c6ff3d !important;
+  --WDS-persistent-always-branded: #c6ff3d !important;
+  --WDS-persistent-activity-indicator: #c6ff3d !important;
+  --WDS-components-filter-surface-selected: #1c2410 !important;
+  --WDS-components-badge-muted: #33363c !important;
+
+  --WDS-lines-divider: #24262a !important;
+  --WDS-lines-outline-deemphasized: #25272c !important;
+  --WDS-lines-outline-default: #33363c !important;
+
+  /* Nomes antigos que alguns painéis (emojis, menus, mídia) ainda usam. */
+  --app-background: #121315 !important;
+  --navbar-background: #17181b !important;
+  --panel-background: #17181b !important;
+  --panel-background-deep: #121315 !important;
+  --panel-input-background: #22242a !important;
+  --picker-background: #1a1b1f !important;
+  --background-default-rgb: 18, 19, 21 !important;
+  --input-border-active: #c6ff3d !important;
 }

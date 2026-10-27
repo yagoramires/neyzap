@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private static let showRequest = Notification.Name("local.neyzap.show")
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        NSApp.appearance = NSAppearance(named: .darkAqua) // tema Grafite: só escuro
         // Uma instância só: duas cópias mexendo nos mesmos dados podem corromper sessões.
         let others = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "local.neyzap")
             .filter { $0 != NSRunningApplication.current && !$0.isTerminated }

@@ -20,7 +20,7 @@ final class TabBarView: NSView {
     /// Terminou de renomear (para devolver o foco ao WhatsApp).
     var onEditingEnded: (() -> Void)?
     /// Largura máxima (a janela informa ao mudar de tamanho): acima disso os nomes encolhem.
-    var maxWidth: CGFloat = .greatestFiniteMagnitude { didSet { invalidateIntrinsicContentSize() } }
+    var maxWidth: CGFloat = .greatestFiniteMagnitude { didSet { refreshCompact() } }
 
     private let stack = NSStackView()
     private let addButton = NSButton()
@@ -39,7 +39,7 @@ final class TabBarView: NSView {
         addButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "Nova guia")
         addButton.symbolConfiguration = .init(pointSize: 12, weight: .medium)
         addButton.isBordered = false
-        addButton.contentTintColor = .secondaryLabelColor
+        addButton.contentTintColor = Grafite.muted
         addButton.toolTip = "Nova guia (⌘T)"
         addButton.target = self
         addButton.action = #selector(addTapped)
@@ -92,12 +92,21 @@ final class TabBarView: NSView {
             item.isSelected = tab.id == selected
             item.canClose = tabs.count > 1
         }
-        invalidateIntrinsicContentSize()
+        refreshCompact()
         // Guias novas ou que mudaram de lugar só têm tamanho depois do layout.
         DispatchQueue.main.async { [weak self] in
             self?.layoutSubtreeIfNeeded()
             self?.items.forEach { $0.refreshHoverFromMouse() }
         }
+    }
+
+    /// Sem espaço para todos os nomes, as guias de trás ficam só com a inicial (e os
+    /// selos): a aberta mantém o nome, e nenhuma guia vai parar no menu de excedentes.
+    private func refreshCompact() {
+        items.forEach { $0.compact = false }
+        let compact = stack.fittingSize.width > maxWidth
+        items.forEach { $0.compact = compact }
+        invalidateIntrinsicContentSize()
     }
 
     override var intrinsicContentSize: NSSize {
@@ -119,8 +128,9 @@ final class TabBarView: NSView {
 
 private final class TabItemView: NSView, NSTextFieldDelegate {
     var tab: TabBarView.Tab { didSet { refresh() } }
-    var isSelected = false { didSet { needsDisplay = true } }
+    var isSelected = false { didSet { needsDisplay = true; refresh() } }
     var canClose = true { didSet { refreshClose() } }
+    var compact = false { didSet { if compact != oldValue { refresh() } } }
     var onSelect: (() -> Void)?
     var onClose: (() -> Void)?
     var onRename: ((String) -> Void)?
@@ -130,8 +140,8 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
 
     private let avatar = InitialBadgeView()
     private let label = NSTextField(labelWithString: "")
-    private let unreadBadge = CountBadgeView(color: .systemRed)
-    private let archivedBadge = CountBadgeView(color: .systemGray, symbol: "archivebox.fill")
+    private let unreadBadge = CountBadgeView(color: Grafite.accent, textColor: Grafite.onAccent)
+    private let archivedBadge = CountBadgeView(color: Grafite.ghostBorder, textColor: Grafite.ghostText, symbol: "archivebox.fill")
     private let closeButton = NSButton()
     private var hovering = false { didSet { needsDisplay = true; refreshClose() } }
     private var editingOriginal: String?
@@ -153,7 +163,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Fechar guia")
         closeButton.symbolConfiguration = .init(pointSize: 9, weight: .bold)
         closeButton.isBordered = false
-        closeButton.contentTintColor = .secondaryLabelColor
+        closeButton.contentTintColor = Grafite.muted
         closeButton.toolTip = "Fechar guia"
         closeButton.target = self
         closeButton.action = #selector(closeTapped)
@@ -182,7 +192,11 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
 
     private func refresh() {
         avatar.text = tab.name
-        avatar.color = Self.color(for: tab.id)
+        avatar.color = isSelected ? Grafite.accent : Grafite.ghostBorder
+        avatar.textColor = isSelected ? Grafite.onAccent : Grafite.text
+        label.textColor = isSelected ? .white : Grafite.ghostText
+        label.isHidden = compact && !isSelected
+        closeButton.isHidden = compact && !isSelected
         if editingOriginal == nil { label.stringValue = tab.name }
         unreadBadge.count = tab.unread
         archivedBadge.count = tab.archived
@@ -201,16 +215,9 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         closeButton.isEnabled = canClose
     }
 
-    /// Cor estável por guia (não muda ao renomear).
-    private static func color(for id: UUID) -> NSColor {
-        let palette: [NSColor] = [.systemBlue, .systemGreen, .systemOrange, .systemPink, .systemPurple, .systemTeal, .systemIndigo, .systemRed]
-        let sum = withUnsafeBytes(of: id.uuid) { $0.reduce(0) { $0 + Int($1) } }
-        return palette[sum % palette.count]
-    }
-
     override func draw(_ dirtyRect: NSRect) {
         guard isSelected || hovering else { return }
-        NSColor.labelColor.withAlphaComponent(isSelected ? 0.11 : 0.05).setFill()
+        (isSelected ? Grafite.selected : NSColor.white.withAlphaComponent(0.04)).setFill()
         NSBezierPath(roundedRect: bounds.insetBy(dx: 0, dy: 0.5), xRadius: 7, yRadius: 7).fill()
     }
 
@@ -277,7 +284,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         label.isEditable = true
         label.isSelectable = true
         label.drawsBackground = true
-        label.backgroundColor = .textBackgroundColor
+        label.backgroundColor = Grafite.bg
         label.isBezeled = false
         window?.makeFirstResponder(label)
         label.currentEditor()?.selectAll(nil)
@@ -327,16 +334,17 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
 
 // MARK: - Peças
 
-/// Quadradinho colorido com a inicial do nome da guia.
+/// Quadradinho com a inicial do nome da guia (limão na guia aberta).
 private final class InitialBadgeView: NSView {
     var text = "" { didSet { needsDisplay = true } }
-    var color: NSColor = .systemBlue { didSet { needsDisplay = true } }
+    var color: NSColor = Grafite.ghostBorder { didSet { needsDisplay = true } }
+    var textColor: NSColor = Grafite.text { didSet { needsDisplay = true } }
 
     override func draw(_ dirtyRect: NSRect) {
         color.setFill()
         NSBezierPath(roundedRect: bounds, xRadius: 4.5, yRadius: 4.5).fill()
         let initial = text.trimmingCharacters(in: .whitespaces).first.map { String($0).uppercased() } ?? "?"
-        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 10.5, weight: .bold), .foregroundColor: NSColor.white]
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 10.5, weight: .bold), .foregroundColor: textColor]
         let size = initial.size(withAttributes: attrs)
         initial.draw(at: NSPoint(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2), withAttributes: attrs)
     }
@@ -346,11 +354,13 @@ private final class InitialBadgeView: NSView {
 private final class CountBadgeView: NSView {
     var count = 0 { didSet { isHidden = count == 0; invalidateIntrinsicContentSize(); needsDisplay = true } }
     private let color: NSColor
+    private let textColor: NSColor
     private let icon: NSImage?
     private let font = NSFont.systemFont(ofSize: 10.5, weight: .bold)
 
-    init(color: NSColor, symbol: String? = nil) {
+    init(color: NSColor, textColor: NSColor, symbol: String? = nil) {
         self.color = color
+        self.textColor = textColor
         icon = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 8.5, weight: .bold)) }
         super.init(frame: .zero)
         isHidden = true
@@ -371,13 +381,13 @@ private final class CountBadgeView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         color.setFill()
         NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: textColor]
         let textSize = text.size(withAttributes: attrs)
         var x = bounds.midX - (textSize.width + (icon.map { $0.size.width + 3 } ?? 0)) / 2
         if let icon {
             let tinted = NSImage(size: icon.size, flipped: false) { r in
                 icon.draw(in: r)
-                NSColor.white.set()
+                self.textColor.set()
                 r.fill(using: .sourceAtop)
                 return true
             }
