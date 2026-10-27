@@ -2,7 +2,9 @@
 
 WhatsApp com uma UI decente no Mac: várias contas na mesma janela e o Instagram junto.
 
-![Notificação do NeyZap com a foto do contato](docs/notification.png)
+![A janela do NeyZap no tema Grafite: guias Pessoal, Trabalho e Instagram, lista de conversas e uma conversa aberta](docs/window.png)
+
+<sub>Prints com contatos e mensagens de exemplo.</sub>
 
 O NeyZap é uma alternativa ao app nativo da Meta: um WhatsApp com uma UI decente, **várias contas** na mesma janela e **conexão com o Instagram**.
 
@@ -60,9 +62,10 @@ Abra o app e leia o QR code com o celular. Cada número é uma guia; use **+** (
 
 ### Várias contas
 
-- **Guias como num navegador** — uma guia por número, com inicial colorida, selo
-  vermelho de não lidas e cinza de arquivadas. **+** (⌘T) conecta outro número pelo
-  QR; duplo clique renomeia; **×** fecha.
+- **Guias como num navegador** — uma guia por número, com a inicial (em limão na
+  guia aberta), selo limão de não lidas e cinza de arquivadas. **+** (⌘T) conecta
+  outro número pelo QR; duplo clique renomeia; **×** fecha. Sem espaço para todos
+  os nomes, as guias de trás ficam só com a inicial.
 - **Contas independentes** — a guia fora da tela continua recebendo e notificando,
   sem marcar nada como lido.
 - **Lado a lado** (⌘\\) — todas as contas visíveis ao mesmo tempo.
@@ -79,6 +82,10 @@ Abra o app e leia o QR code com o celular. Cada número é uma guia; use **+** (
 
 ### Um WhatsApp melhor
 
+<img src="docs/compact.png" width="260" align="right" alt="O NeyZap numa janela estreita: uma coluna só e as guias de trás só com a inicial">
+
+- **Visual Grafite** — o mesmo tema escuro dos apps do NeyHub: grafite com destaque
+  verde-limão, conversa sem papel de parede e ícone no mesmo padrão.
 - **Janela de qualquer tamanho** — abaixo de 760 px vira uma coluna por vez, como no
   celular, com botão de voltar (⌘[). Painéis, emojis, fotos e prévias se ajustam.
 - **Marcar como lida num clique** — o ✓ à esquerda da foto marca a conversa como lida
@@ -87,8 +94,13 @@ Abra o app e leia o QR code com o celular. Cada número é uma guia; use **+** (
   Copiar…) em qualquer parte da mensagem, inclusive em cima do texto.
 - **Notificações com a foto do contato** — com o nome da guia, abrem a conversa no
   clique e não somem com o mouse em cima.
-- **Mais limpo** — sem Meta AI, sem propaganda do app oficial, sem barras de rolagem.
+- **Mais limpo** — sem Meta AI, Status, Comunidades e sugestões de canais, sem
+  propaganda do app oficial, sem barras de rolagem.
 - **Tema próprio** — `NeyZap → Editar tema` abre um CSS que aplica ao salvar.
+
+<br clear="right">
+
+![Notificação do NeyZap com a foto do contato](docs/notification.png)
 
 ### Limitações
 
@@ -121,7 +133,7 @@ Abra o app e leia o QR code com o celular. Cada número é uma guia; use **+** (
 - **Lado a lado** (⌘\\): todas as contas visíveis ao mesmo tempo.
 - **Sempre na frente** (⌥⌘T) e zoom (⌘+ / ⌘− / ⌘0).
 - **Tema próprio**: `NeyZap → Editar tema` (⌘,) abre um CSS que aplica ao salvar.
-- **Mais limpo**: sem Meta AI, sem propaganda do app oficial, sem barras de rolagem.
+- **Mais limpo**: sem Meta AI, Status, Comunidades e sugestões de canais, sem propaganda do app oficial, sem barras de rolagem.
 
 ### Feito para o Mac
 

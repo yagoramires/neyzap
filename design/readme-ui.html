@@ -1,0 +1,201 @@
+<!doctype html>
+<!--
+  Réplica da janela do NeyZap (tema Grafite) com contatos e mensagens inventados,
+  para os prints do README. Nenhum dado real: o WhatsApp Web só mostraria conversas
+  de verdade. Gerar: scripts/readme-prints.sh (?view=wide | ?view=compact).
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #121315; --side: #17181b; --card: #1a1b1f; --sel: #22242a; --line: #24262a;
+    --ghost: #33363c; --text: #d8d9dc; --muted: #9a9ca3; --dim: #6e7179;
+    --accent: #c6ff3d; --on-accent: #111; --in: #1f2125; --out: #243014; --accent-bg: #1c2410;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; }
+  body { font: 14px/1.35 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; color: var(--text); padding: 28px; }
+  svg { display: block; }
+
+  .win { width: var(--w); height: var(--h); background: var(--side); border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; box-shadow: 0 0 0 .5px #000, 0 0 0 1px #ffffff14 inset, 0 22px 60px #0009; }
+
+  /* Barra de título com as guias (nativas no app) */
+  .titlebar { height: 38px; flex: none; display: flex; align-items: center; padding: 0 12px 0 14px; gap: 2px; }
+  .lights { display: flex; gap: 8px; margin-right: 14px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .tab { height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 8px; border-radius: 7px; color: var(--muted); font-size: 12.5px; font-weight: 500; }
+  .tab.on { background: var(--sel); color: #fff; }
+  .tab .ini { width: 18px; height: 18px; border-radius: 4.5px; background: var(--ghost); color: var(--text); font-size: 10.5px; font-weight: 700; display: grid; place-items: center; }
+  .tab.on .ini { background: var(--accent); color: var(--on-accent); }
+  .tab.off { opacity: .4; }
+  .badge { min-width: 16px; height: 16px; padding: 0 4.5px; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 10.5px; font-weight: 700; display: grid; place-items: center; }
+  .x { width: 16px; color: var(--dim); font-size: 11px; text-align: center; }
+  .plus { width: 26px; color: var(--dim); display: grid; place-items: center; }
+  .spacer { flex: 1; }
+  .tool { width: 28px; color: var(--dim); display: grid; place-items: center; }
+
+  .body { flex: 1; display: flex; min-height: 0; }
+
+  /* Trilho */
+  .rail { width: 64px; flex: none; background: var(--side); display: flex; flex-direction: column; align-items: center; padding: 10px 0 14px; gap: 6px; }
+  .rail .ico { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); position: relative; }
+  .rail .ico.on { background: var(--sel); color: var(--text); }
+  .rail .dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .rail .me { width: 30px; height: 30px; border-radius: 50%; background: #242447; color: #a791ff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+
+  /* Lista */
+  .list { width: var(--list); flex: none; background: var(--bg); display: flex; flex-direction: column; border-right: 1px solid var(--line); min-width: 0; }
+  .list.full { flex: 1; width: auto; border-right: 0; }
+  .lhead { height: 64px; display: flex; align-items: center; padding: 0 16px 0 20px; }
+  .logo { font-size: 22px; font-weight: 700; letter-spacing: -.3px; color: #fff; flex: 1; }
+  .logo b { color: var(--accent); font-weight: 700; }
+  .kebab { color: var(--muted); margin-right: 14px; }
+  .new { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
+  .search svg { flex: none; }
+  .search span { overflow: hidden; text-overflow: ellipsis; }
+  .search { margin: 0 16px; height: 40px; border-radius: 20px; background: var(--card); display: flex; align-items: center; gap: 12px; padding: 0 16px; color: var(--muted); font-size: 14.5px; white-space: nowrap; overflow: hidden; }
+  .chips { display: flex; gap: 8px; padding: 12px 16px 6px; }
+  .chip { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--ghost); color: var(--muted); font-size: 14px; font-weight: 500; display: grid; place-items: center; white-space: nowrap; }
+  .chip.on { background: var(--accent-bg); border-color: var(--accent-bg); color: #e3ff9e; }
+  .arch { height: 50px; display: flex; align-items: center; gap: 22px; padding: 0 26px; color: var(--muted); font-size: 16px; }
+  .arch span { flex: 1; }
+  .arch small { font-size: 12px; }
+  .rows { flex: 1; overflow: hidden; }
+  .row { height: 72px; display: flex; align-items: center; gap: 14px; padding: 0 14px; margin: 0 8px; border-radius: 10px; }
+  .row.on { background: var(--sel); }
+  .av { width: 49px; height: 49px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 18px; font-weight: 600; }
+  .meta { flex: 1; min-width: 0; }
+  .l1, .l2 { display: flex; align-items: center; gap: 8px; }
+  .name { flex: 1; font-size: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .time { font-size: 12px; color: var(--muted); }
+  .time.hot { color: var(--accent); }
+  .prev { flex: 1; font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .tick { color: var(--accent); display: inline-block; vertical-align: -1px; margin-right: 3px; }
+  .ub { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+
+  /* Conversa */
+  .chat { flex: 1; display: flex; flex-direction: column; background: var(--bg); min-width: 0; }
+  .chead { height: 60px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 18px; background: var(--side); border-bottom: 1px solid var(--line); }
+  .chead .av { width: 40px; height: 40px; font-size: 15px; }
+  .chead .t { flex: 1; }
+  .chead .t div { font-size: 16px; }
+  .chead .t small { font-size: 13px; color: var(--muted); }
+  .chead .ic { color: var(--muted); margin-left: 18px; }
+  .msgs { flex: 1; padding: 18px 62px 10px; display: flex; flex-direction: column; gap: 3px; justify-content: flex-end; }
+  .day { align-self: center; background: var(--card); color: var(--muted); font-size: 12.5px; padding: 5px 12px; border-radius: 8px; margin-bottom: 10px; }
+  .b { max-width: 65%; padding: 6px 9px 7px; border-radius: 8px; font-size: 14.2px; color: var(--text); position: relative; }
+  .b.in { align-self: flex-start; background: var(--in); }
+  .b.out { align-self: flex-end; background: var(--out); }
+  .b.first { margin-top: 9px; }
+  .b .s { float: right; margin: 6px 0 -4px 10px; font-size: 11px; color: var(--muted); display: flex; gap: 3px; align-items: center; }
+  .b.out .s .tick { color: var(--accent); margin: 0; }
+  .compose { height: 62px; flex: none; display: flex; align-items: center; padding: 0 14px 10px; }
+  .pill { flex: 1; height: 46px; border-radius: 23px; background: var(--card); display: flex; align-items: center; gap: 16px; padding: 0 16px; color: var(--muted); }
+  .pill span { flex: 1; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="win" id="win">
+  <div class="titlebar">
+    <div class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+    <div class="tab on"><span class="ini">P</span><span class="nm">Pessoal</span><span class="badge">7</span><span class="x">✕</span></div>
+    <div class="tab"><span class="ini">T</span><span class="nm">Trabalho</span><span class="badge">2</span></div>
+    <div class="tab off"><span class="ini">I</span><span class="nm">Instagram</span></div>
+    <div class="plus"><svg width="13" height="13" viewBox="0 0 13 13"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+    <div class="spacer"></div>
+    <div class="tool sbs"><svg width="17" height="14" viewBox="0 0 17 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x=".7" y=".7" width="15.6" height="12.6" rx="2.5"/><path d="M8.5 1v12"/></svg></div>
+    <div class="tool"><svg width="13" height="16" viewBox="0 0 13 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M3.5 1.2h6M4.3 1.2v4.6L1.6 9.3h9.8L8.7 5.8V1.2M6.5 9.3v5.5"/></svg></div>
+  </div>
+  <div class="body">
+    <div class="rail" id="rail">
+      <div class="ico on"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2z" opacity=".95"/><path d="M7 9h10M7 12.5h7" stroke="#22242a" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+      <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M5 3.5h3.2l1.6 4.2-2 1.4a11 11 0 0 0 5.1 5.1l1.4-2 4.2 1.6V17a2.6 2.6 0 0 1-2.8 2.5C9.5 19 5 14.5 4.5 7.3A2.6 2.6 0 0 1 5 3.5z"/></svg></div>
+      <div class="ico"><span class="dot"></span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3.5a8.5 8.5 0 1 1-4.6 15.6L3.5 20.5l1.3-3.8A8.5 8.5 0 0 1 12 3.5z" stroke-linejoin="round"/><circle cx="8.5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="15.5" cy="12" r="1" fill="currentColor"/></svg></div>
+      <div class="spacer"></div>
+      <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="6.5" y="3.5" width="14" height="14" rx="2"/><path d="M3.5 7v11.5a2 2 0 0 0 2 2H17M9 14.5l3-3.5 2.5 2.5 1.5-1.5 2.5 2.5"/></svg></div>
+      <div class="me">V</div>
+    </div>
+    <div class="list" id="list">
+      <div class="lhead">
+        <div class="logo">ney<b>zap</b></div>
+        <svg class="kebab" width="4" height="18" viewBox="0 0 4 18" fill="currentColor"><circle cx="2" cy="2" r="2"/><circle cx="2" cy="9" r="2"/><circle cx="2" cy="16" r="2"/></svg>
+        <div class="new"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 1.5v13M1.5 8h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="search"><svg width="17" height="17" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5.5"/><path d="M11.2 11.2 16 16" stroke-linecap="round"/></svg><span>Pesquisar ou começar uma nova conversa</span></div>
+      <div class="chips" id="chips"><div class="chip on">Tudo</div><div class="chip">Não lidas</div><div class="chip">Favoritas</div><div class="chip">Grupos</div><div class="chip">+</div></div>
+      <div class="arch"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="1.5" y="2" width="15" height="14" rx="2"/><path d="M1.5 6.5h15M9 9v4.5M6.8 11.5 9 13.5l2.2-2"/></svg><span>Arquivadas</span><small>2</small></div>
+      <div class="rows" id="rows"></div>
+    </div>
+    <div class="chat" id="chat">
+      <div class="chead">
+        <div class="av" style="background:#35221e;color:#fc9775">M</div>
+        <div class="t"><div>Marina</div><small>online</small></div>
+        <svg class="ic" width="24" height="18" viewBox="0 0 24 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="1" y="2.5" width="15" height="13" rx="2.5"/><path d="m16 7.5 6-3.5v10l-6-3.5"/></svg>
+        <svg class="ic" width="18" height="18" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5.5"/><path d="M11.2 11.2 16 16" stroke-linecap="round"/></svg>
+        <svg class="ic" width="4" height="18" viewBox="0 0 4 18" fill="currentColor"><circle cx="2" cy="2" r="2"/><circle cx="2" cy="9" r="2"/><circle cx="2" cy="16" r="2"/></svg>
+      </div>
+      <div class="msgs" id="msgs"></div>
+      <div class="compose"><div class="pill">
+        <svg width="18" height="18" viewBox="0 0 16 16"><path d="M8 1.5v13M1.5 8h13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><circle cx="7.3" cy="8" r=".9" fill="currentColor"/><circle cx="12.7" cy="8" r=".9" fill="currentColor"/><path d="M6.5 12a4 4 0 0 0 7 0" stroke-linecap="round"/></svg>
+        <span>Digite uma mensagem</span>
+        <svg width="16" height="20" viewBox="0 0 16 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4.5" y="1" width="7" height="12" rx="3.5"/><path d="M1.5 9.5a6.5 6.5 0 0 0 13 0M8 16v3"/></svg>
+      </div></div>
+    </div>
+  </div>
+</div>
+<script>
+  // Tudo inventado: nomes, mensagens e horários.
+  const tick = '<svg class="tick" width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m1 6 3.2 3.2L10 2.5M7.5 8.6l.6.6L14 2.5"/></svg>';
+  const chats = [
+    ['Marina', 'M', '#35221e', '#fc9775', 'Chegando em 10 min! Já pede a pizza 🍕', '19:42', 2],
+    ['Futebol de quinta ⚽', 'F', '#103529', '#25d366', 'Rafa: Quem confirma? Faltam 3', '19:37', 5],
+    ['Família', 'F', '#242447', '#a791ff', 'Tia Lu: Domingo tem almoço aqui, hein', '19:30'],
+    ['Carlos Lima', 'C', '#092642', '#53a6fd', tick + ' Fechado, te mando o PDF amanhã', '18:05'],
+    ['Ana Souza', 'A', '#36192a', '#ff72a1', '📷 Foto', '16:20'],
+    ['Condomínio Bloco B', 'C', '#362c1f', '#ffd279', 'Síndico: Reunião hoje às 20h no salão', '15:48'],
+    ['Pedro Alves', 'P', '#092d2f', '#42c7b8', 'kkkkkk não acredito', 'Ontem'],
+    ['Juliana', 'J', '#321622', '#fb5061', '🎤 Áudio (0:42)', 'Ontem'],
+    ['Diego', 'D', '#35271e', '#dba685', tick + ' Valeu, chegou certinho!', 'sábado'],
+  ];
+  document.getElementById('rows').innerHTML = chats.map(([n, i, bg, fg, p, t, u]) => `
+    <div class="row">
+      <div class="av" style="background:${bg};color:${fg}">${i}</div>
+      <div class="meta">
+        <div class="l1"><span class="name">${n}</span><span class="time${u ? ' hot' : ''}">${t}</span></div>
+        <div class="l2"><span class="prev">${p}</span>${u ? `<span class="ub">${u}</span>` : ''}</div>
+      </div>
+    </div>`).join('');
+  const msgs = [
+    ['in', 'Oi! Sexta tá de pé?', '19:30', 1],
+    ['out', 'Tá sim! Que horas?', '19:31', 1],
+    ['in', 'Umas 20h lá em casa', '19:31', 1],
+    ['in', 'Pode levar o vinho? 🍷', '19:32'],
+    ['out', 'Levo dois 😄', '19:33', 1],
+    ['out', 'Quer que eu passe no mercado também?', '19:33'],
+    ['in', 'Não precisa, já comprei tudo', '19:40', 1],
+    ['in', 'Chegando em 10 min! Já pede a pizza 🍕', '19:42'],
+  ];
+  document.getElementById('msgs').innerHTML = '<div class="day">Hoje</div>' + msgs.map(([k, t, h, first], idx) =>
+    `<div class="b ${k}${first && idx ? ' first' : ''}">${t}<span class="s">${h}${k === 'out' ? tick : ''}</span></div>`).join('');
+</script>
+<script>
+  const view = new URLSearchParams(location.search).get('view') || 'wide';
+  const win = document.getElementById('win');
+  if (view === 'compact') {
+    // Janela estreita: uma coluna, e as guias de trás só com a inicial.
+    win.style.cssText = '--w:420px;--h:740px';
+    document.getElementById('chat').remove();
+    document.getElementById('list').classList.add('full');
+    document.querySelectorAll('.tab:not(.on) .nm').forEach((e) => e.remove());
+    document.querySelector('.sbs').remove();
+    document.querySelectorAll('#chips .chip').forEach((c, i) => { if (i >= 3) c.remove(); });
+  } else {
+    win.style.cssText = '--w:1180px;--h:760px;--list:420px';
+    document.querySelector('#rows .row').classList.add('on');
+  }
+</script>
+</body>
+</html>
