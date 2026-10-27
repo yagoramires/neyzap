@@ -540,10 +540,20 @@
 
   // Foco decide a coluna visível no modo compacto: abrir uma conversa foca o
   // campo de mensagem (#main); buscar ou navegar na lista foca a lista (#side).
+  // Fechar um painel da lista (a seta de Arquivadas, por exemplo) também faz o
+  // WhatsApp devolver o foco ao campo de mensagem; aí a lista continua.
+  let sideClickAt = 0;
+  document.addEventListener('mousedown', (e) => {
+    const t = e.target;
+    const plain = t instanceof Element && sidePane && sidePane.contains(t) && !t.closest(CHAT_ROWS);
+    sideClickAt = plain ? Date.now() : 0;
+  }, true);
   document.addEventListener('focusin', (e) => {
     const t = e.target;
     if (!(t instanceof Element)) return;
-    if (t.closest('#main')) setView('chat');
+    if (t.closest('#main')) {
+      if (Date.now() - sideClickAt > 1000) setView('chat');
+    }
     else if (sidePane && sidePane.contains(t)) setView('list');
   }, true);
 

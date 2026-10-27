@@ -2,6 +2,11 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [0.4.1] - 2026-10-27
+
+### Corrigido
+- Janela estreita: a seta de voltar de **Arquivadas** abria a última conversa em vez de voltar para a lista.
+
 ## [0.4.0] - 2026-10-27
 
 ### Alterado
