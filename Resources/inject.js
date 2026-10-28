@@ -171,6 +171,8 @@
   let panes = null;     // container das colunas
   let sidePane = null;  // coluna que contém #side
   let hadMain = false;
+  let sideClickAt = 0;  // fechar um painel da lista (seta, Esc) segura a lista por um instante
+  const holdList = () => Date.now() - sideClickAt < 1500;
 
   function setView(view) {
     if (root.dataset.nzView === view) return;
@@ -323,7 +325,8 @@
   function tick() {
     tagPanes();
     const hasMain = !!document.getElementById('main');
-    if (hasMain && !hadMain) setView('chat');
+    // o WhatsApp pode recriar a conversa ao fechar Arquivadas: aí a lista continua
+    if (hasMain && !hadMain && !holdList()) setView('chat');
     if (!hasMain && hadMain) setView('list');
     hadMain = hasMain;
     updateBackButton();
@@ -542,17 +545,23 @@
   // campo de mensagem (#main); buscar ou navegar na lista foca a lista (#side).
   // Fechar um painel da lista (a seta de Arquivadas, por exemplo) também faz o
   // WhatsApp devolver o foco ao campo de mensagem; aí a lista continua.
-  let sideClickAt = 0;
+  // A seta pode morar numa camada fora de #side, e Esc fecha o painel sem clique:
+  // por isso conta qualquer botão de voltar e o Esc com a lista à mostra.
+  const BACK = '[aria-label="Voltar"], [aria-label="Back"], [data-icon^="back"], [data-icon*="arrow-back"]';
   document.addEventListener('mousedown', (e) => {
     const t = e.target;
-    const plain = t instanceof Element && sidePane && sidePane.contains(t) && !t.closest(CHAT_ROWS);
+    const plain = t instanceof Element && !t.closest(CHAT_ROWS)
+      && ((sidePane && sidePane.contains(t)) || (root.dataset.nzView === 'list' && !!t.closest(BACK)));
     sideClickAt = plain ? Date.now() : 0;
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && root.dataset.nzView === 'list') sideClickAt = Date.now();
   }, true);
   document.addEventListener('focusin', (e) => {
     const t = e.target;
     if (!(t instanceof Element)) return;
     if (t.closest('#main')) {
-      if (Date.now() - sideClickAt > 1000) setView('chat');
+      if (!holdList()) setView('chat');
     }
     else if (sidePane && sidePane.contains(t)) setView('list');
   }, true);

@@ -2,6 +2,11 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [0.4.2] - 2026-10-28
+
+### Corrigido
+- Janela estreita: a seta de voltar de **Arquivadas** ainda abria a última conversa quando a seta ficava fora da coluna da lista, quando o painel era fechado com Esc ou quando o WhatsApp recriava a conversa ao fechar.
+
 ## [0.4.1] - 2026-10-27
 
 ### Corrigido
