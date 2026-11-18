@@ -3,7 +3,7 @@ import AppKit
 /// Guias no estilo navegador: uma por número, com inicial colorida, nome, selos de
 /// não lidas/arquivadas, × no hover e + para abrir outra. Duplo clique renomeia.
 final class TabBarView: NSView {
-    struct Tab: Equatable {
+    struct Tab {
         let id: UUID
         var name: String
         var unread: Int

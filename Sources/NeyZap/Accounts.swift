@@ -1,6 +1,6 @@
 import Foundation
 
-struct Account: Codable, Equatable {
+struct Account: Codable {
     enum Site: String, Codable { case whatsapp, instagram }
 
     let id: UUID

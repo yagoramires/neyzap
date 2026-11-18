@@ -1,5 +1,4 @@
 import AppKit
-import WebKit
 import Carbon
 import ServiceManagement
 
@@ -257,7 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         case #selector(toggleLaunchAtLogin): menuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         case #selector(toggleStatusItem): menuItem.state = statusItem == nil ? .off : .on
         case #selector(toggleSystemNotifications): menuItem.state = Prefs.systemNotifications ? .on : .off
-        case #selector(removeAccount): return windowController.sessions.count > 1
+        case #selector(removeAccount): return windowController.canCloseTab
         default: break
         }
         return true

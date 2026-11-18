@@ -70,10 +70,9 @@ enum AppPaths {
 }
 
 enum Dialogs {
-    static func prompt(title: String, message: String = "", defaultValue: String = "", confirm: String = "OK") -> String? {
+    static func prompt(title: String, defaultValue: String = "", confirm: String = "OK") -> String? {
         let alert = NSAlert()
         alert.messageText = title
-        alert.informativeText = message
         alert.addButton(withTitle: confirm)
         alert.addButton(withTitle: "Cancelar")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))

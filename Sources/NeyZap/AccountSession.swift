@@ -42,6 +42,7 @@ final class AccountSession: NSObject {
     private var notificationIDs: [String: String] = [:] // id no JS → id na Central
     private var downloads: [ObjectIdentifier: URL] = [:]
     private var recentCrashes: [Date] = []
+    private static let whatsAppHost = "web.whatsapp.com"
     private static let externalSchemes: Set<String> = ["mailto", "tel", "sms", "facetime", "facetime-audio"]
 
     init(account: Account, keepAlive: Bool = false) {
@@ -50,7 +51,7 @@ final class AccountSession: NSObject {
         isInstagram = account.site == .instagram
         isDisabled = account.disabled == true
         keepAliveStarted = isDisabled && keepAlive ? Date() : nil
-        home = URL(string: isInstagram ? "https://www.instagram.com/" : "https://web.whatsapp.com/")!
+        home = URL(string: isInstagram ? "https://www.instagram.com/" : "https://\(Self.whatsAppHost)/")!
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore(forIdentifier: account.id)
@@ -246,7 +247,7 @@ final class AccountSession: NSObject {
         if isInstagram { return }
         if Prefs.debugNoInject { return }
         let bgSyncCheckedAt = Int(prefs.bgSyncCheckedAt?.timeIntervalSince1970 ?? 0) * 1000
-        let config = "window.__neyzapConfig = { baseCSS: \(jsLiteral(Self.baseCSS)), userCSS: \(jsLiteral(userCSS)), compactWidth: 760, bgSyncCheckedAt: \(bgSyncCheckedAt) };"
+        let config = "window.__neyzapConfig = { baseCSS: \(jsLiteral(Self.baseCSS)), userCSS: \(jsLiteral(userCSS)), bgSyncCheckedAt: \(bgSyncCheckedAt) };"
         controller.addUserScript(WKUserScript(source: config, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         controller.addUserScript(WKUserScript(source: Self.injectJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
@@ -277,7 +278,7 @@ final class AccountSession: NSObject {
 extension AccountSession: WKScriptMessageHandler {
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         // Só o próprio script, no quadro principal do WhatsApp Web (não iframes de prévias).
-        guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == "web.whatsapp.com",
+        guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == Self.whatsAppHost,
               let raw = message.body as? [String: Any], let type = raw["type"] as? String else { return }
         // Desativada conectando só para manter o aparelho: sem notificações nem selos.
         if isDisabled && type != "log" { return }
@@ -398,7 +399,7 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
     /// Instagram inclui o login pelo Facebook, que redireciona a guia para facebook.com.
     private func isOwnHost(_ host: String?) -> Bool {
         guard let host = host?.lowercased() else { return false }
-        guard isInstagram else { return host == "web.whatsapp.com" }
+        guard isInstagram else { return host == Self.whatsAppHost }
         return ["instagram.com", "facebook.com"].contains { host == $0 || host.hasSuffix(".\($0)") }
     }
 
@@ -495,7 +496,7 @@ extension AccountSession: WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
-        decisionHandler(origin.protocol == "https" && origin.host == "web.whatsapp.com" ? .grant : .deny)
+        decisionHandler(origin.protocol == "https" && origin.host == Self.whatsAppHost ? .grant : .deny)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {

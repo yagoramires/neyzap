@@ -22,6 +22,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         return selectedSession
     }
 
+    /// A última guia não fecha.
+    var canCloseTab: Bool { sessions.count > 1 }
+
     var isSideBySide: Bool {
         get { Prefs.sideBySide }
         set { Prefs.sideBySide = newValue; layoutSessions() }
@@ -43,7 +46,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.backgroundColor = Grafite.sidebar
-        window.minSize = NSSize(width: 320, height: 420)
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
         window.center()
@@ -187,7 +189,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     /// Fecha a guia e apaga a sessão dela deste Mac (o número precisa ler o QR de novo).
     func confirmClose(accountID: UUID) {
-        guard sessions.count > 1, let session = sessions.first(where: { $0.accountID == accountID }) else { return }
+        guard canCloseTab, let session = sessions.first(where: { $0.accountID == accountID }) else { return }
         let ok = Dialogs.confirm(
             title: "Fechar a guia “\(session.name)”?",
             message: session.isInstagram
@@ -336,7 +338,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             }
             webView.frame = parked.bounds
             webView.autoresizingMask = [.width, .height]
-            webView.isHidden = false
             if session.parkedAt == nil {
                 session.parkedAt = Date()
                 // Reel saindo da tela não continua tocando no fundo.
@@ -344,7 +345,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
             }
         }
         for session in visible {
-            session.webView.isHidden = false
             session.parkedAt = nil
         }
     }
