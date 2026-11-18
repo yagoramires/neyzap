@@ -10,7 +10,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     private let tabBar = TabBarView()
     private let splitView = NSSplitView()
-    private let defaults = UserDefaults.standard
 
     var selectedSession: AccountSession { sessions[selectedIndex] }
 
@@ -24,13 +23,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     }
 
     var isSideBySide: Bool {
-        get { defaults.bool(forKey: "sideBySide") }
-        set { defaults.set(newValue, forKey: "sideBySide"); layoutSessions() }
+        get { Prefs.sideBySide }
+        set { Prefs.sideBySide = newValue; layoutSessions() }
     }
 
     var isPinned: Bool {
-        get { defaults.bool(forKey: "pinned") }
-        set { defaults.set(newValue, forKey: "pinned"); window?.level = newValue ? .floating : .normal; refreshToolbar() }
+        get { Prefs.pinned }
+        set { Prefs.pinned = newValue; window?.level = newValue ? .floating : .normal; refreshToolbar() }
     }
 
     init() {
@@ -77,7 +76,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         window.toolbarStyle = .unifiedCompact
 
         sessions = AccountStore.shared.accounts.map { makeSession($0) }
-        selectedIndex = min(defaults.integer(forKey: "selectedAccount"), sessions.count - 1)
+        selectedIndex = min(Prefs.selectedAccount, sessions.count - 1)
         if isPinned { window.level = .floating }
         layoutSessions()
 
@@ -115,7 +114,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         guard let i = sessions.firstIndex(where: { $0.accountID == accountID }) else { return }
         let old = sessions[i]
         AccountStore.shared.setDisabled(accountID, !old.isDisabled)
-        if !old.isDisabled { defaults.set(Date(), forKey: "lastOnline-\(accountID.uuidString)") }
+        if !old.isDisabled { AccountPrefs(id: accountID).lastOnline = Date() }
         Log.write("[\(old.name)] guia \(old.isDisabled ? "ativada" : "desativada")")
         replaceSession(at: i)
     }
@@ -127,20 +126,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         BannerCenter.shared.dismissAll(accountID: old.accountID)
         sessions[i] = makeSession(account, keepAlive: keepAlive)
         layoutSessions()
-        onUnreadChange?() // atualiza selos, Dock e menus
+        onUnreadChange?()
     }
 
     /// O WhatsApp desconecta aparelhos que passam muito tempo sem se conectar: guia de
     /// WhatsApp desativada há 7 dias conecta escondida por 15 min e volta a desligar.
     private func keepDisabledLinked() {
         for (i, session) in sessions.enumerated() where session.isDisabled && !session.isInstagram {
-            let key = "lastOnline-\(session.accountID.uuidString)"
+            let prefs = AccountPrefs(id: session.accountID)
             if let started = session.keepAliveStarted {
                 guard started.timeIntervalSinceNow < -15 * 60 else { continue }
-                defaults.set(Date(), forKey: key)
+                prefs.lastOnline = Date()
                 Log.write("[\(session.name)] desativada: conexão de manutenção feita")
                 replaceSession(at: i)
-            } else if (defaults.object(forKey: key) as? Date ?? .distantPast).timeIntervalSinceNow < -7 * 86400 {
+            } else if (prefs.lastOnline ?? .distantPast).timeIntervalSinceNow < -7 * 86400 {
                 replaceSession(at: i, keepAlive: true)
             }
         }
@@ -148,9 +147,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     func select(index: Int) {
         guard sessions.indices.contains(index) else { return }
-        selectedIndex = index
-        defaults.set(index, forKey: "selectedAccount")
+        setSelected(index)
         layoutSessions()
+    }
+
+    private func setSelected(_ index: Int) {
+        selectedIndex = index
+        Prefs.selectedAccount = index
     }
 
     func select(accountID: UUID) {
@@ -219,16 +222,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         sessions.removeAll { $0 === session }
         AccountStore.shared.remove(id)
         BannerCenter.shared.dismissAll(accountID: id)
-        defaults.removeObject(forKey: "bgSyncCheckedAt-\(id.uuidString)")
-        defaults.removeObject(forKey: "lastOnline-\(id.uuidString)")
         if let keep, let i = sessions.firstIndex(where: { $0.accountID == keep }) {
-            selectedIndex = i
+            setSelected(i)
         } else {
-            selectedIndex = min(removedIndex, sessions.count - 1)
+            setSelected(min(removedIndex, sessions.count - 1))
         }
-        defaults.set(selectedIndex, forKey: "selectedAccount")
         layoutSessions()
-        onUnreadChange?() // atualiza selos, Dock e menus
+        onUnreadChange?()
         // Dá tempo da WebView ser liberada antes de apagar o armazenamento.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { Self.deleteData(of: id, retries: 2) }
     }
@@ -280,8 +280,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         guard let i = sessions.firstIndex(where: { $0.accountID == id }) else { return }
         // Guia desativada só aparece lado a lado enquanto selecionada: o layout muda.
         if isSideBySide && !sessions[i].isDisabled && !selectedSession.isDisabled {
-            selectedIndex = i
-            defaults.set(i, forKey: "selectedAccount")
+            setSelected(i)
             window?.makeFirstResponder(selectedSession.webView)
             refreshTabs()
         } else {
@@ -350,14 +349,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
         }
     }
 
-    /// Cada conta visível precisa de pelo menos 340 px (320 com uma só).
     private var lastPaneCount = 0
 
     private func updateMinimumSize(panes: Int) {
         guard let window else { return }
         let wanted = panes > 1 ? CGFloat(panes) * 340 + splitView.dividerThickness * CGFloat(panes - 1) : 320
         let screenWidth = (window.screen ?? NSScreen.main)?.visibleFrame.width ?? wanted
-        let width = min(wanted, screenWidth) // muitas guias lado a lado: não passa da tela
+        let width = min(wanted, screenWidth)
         window.minSize = NSSize(width: width, height: 420)
         if window.frame.width < width {
             var frame = window.frame
@@ -377,7 +375,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     func setZoom(_ zoom: CGFloat) {
         let clamped = min(max(zoom, 0.5), 2)
-        defaults.set(Double(clamped), forKey: "zoom")
+        Prefs.zoom = Double(clamped)
         sessions.forEach { $0.webView.pageZoom = clamped }
     }
 
@@ -425,9 +423,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     }
 
     private func refreshTabs() {
-        tabBar.maxWidth = max(120, (window?.frame.width ?? 800) - 190)
+        refreshTabBarWidth()
         let tabs = sessions.map { TabBarView.Tab(id: $0.accountID, name: $0.name, unread: $0.unread, archived: $0.archivedUnread, disabled: $0.isDisabled) }
         tabBar.update(tabs: tabs, selected: sessions.indices.contains(selectedIndex) ? selectedSession.accountID : nil)
+    }
+
+    /// Sobra da janela menos a barra de ferramentas (botões e margens).
+    private func refreshTabBarWidth() {
+        tabBar.maxWidth = max(120, (window?.frame.width ?? 800) - 190)
     }
 
     private func refreshToolbar() {
@@ -450,11 +453,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     // MARK: - Janela
 
-    /// Fechar só esconde: o app continua recebendo mensagens e notificando.
     func windowDidResize(_ notification: Notification) {
-        tabBar.maxWidth = max(120, (window?.frame.width ?? 800) - 190)
+        refreshTabBarWidth()
     }
 
+    /// Fechar só esconde: o app continua recebendo mensagens e notificando.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
         pauseInstagram()

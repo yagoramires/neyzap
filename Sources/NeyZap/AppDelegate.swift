@@ -31,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = WebCryptoKey.data
         Notifier.shared.setup()
-        if UserDefaults.standard.bool(forKey: "systemNotifications") { requestSystemNotifications(explain: false) }
+        if Prefs.systemNotifications { requestSystemNotifications(explain: false) }
         let openNotification: (UUID, String) -> Void = { [weak self] accountID, jsID in
             guard let self else { return }
             // Escolhe a guia antes de mostrar a janela: senão a anterior aparece por um
@@ -55,8 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
         NSApp.mainMenu = buildMainMenu()
         refreshAccountsMenu()
-        if UserDefaults.standard.bool(forKey: "showStatusItem") { setUpStatusItem() }
-        // ⌃⌥Z mostra/esconde o NeyZap de qualquer lugar.
+        if Prefs.showStatusItem { setUpStatusItem() }
         hotKey = HotKey(keyCode: kVK_ANSI_Z, modifiers: controlKey | optionKey) { [weak self] in self?.toggleWindow() }
 
         debugBridge = DebugBridge(windowController: windowController)
@@ -70,7 +69,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         RunLoop.main.add(daily, forMode: .common)
     }
 
-    /// Menu do ícone no Dock: contas (com não lidas), conectar número, atualizações e logs.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         for (i, session) in windowController.sessions.enumerated() {
@@ -219,7 +217,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menuNeedsUpdate(accountsMenu)
     }
 
-    /// Menus dinâmicos: lista de contas (menu principal) e menu do ícone.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         let sessions = windowController.sessions
@@ -259,7 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         case #selector(togglePinned): menuItem.state = windowController.isPinned ? .on : .off
         case #selector(toggleLaunchAtLogin): menuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         case #selector(toggleStatusItem): menuItem.state = statusItem == nil ? .off : .on
-        case #selector(toggleSystemNotifications): menuItem.state = UserDefaults.standard.bool(forKey: "systemNotifications") ? .on : .off
+        case #selector(toggleSystemNotifications): menuItem.state = Prefs.systemNotifications ? .on : .off
         case #selector(removeAccount): return windowController.sessions.count > 1
         default: break
         }
@@ -311,15 +308,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             setUpStatusItem()
             updateBadges()
         }
-        UserDefaults.standard.set(statusItem != nil, forKey: "showStatusItem")
+        Prefs.showStatusItem = statusItem != nil
     }
 
-    /// Desligado: balões do próprio NeyZap (com a foto). Ligado: Central de Notificações.
     @objc private func toggleSystemNotifications() {
-        let defaults = UserDefaults.standard
-        let on = !defaults.bool(forKey: "systemNotifications")
-        defaults.set(on, forKey: "systemNotifications")
-        if on { requestSystemNotifications(explain: true) }
+        Prefs.systemNotifications.toggle()
+        if Prefs.systemNotifications { requestSystemNotifications(explain: true) }
     }
 
     /// Sem permissão da Central de Notificações nada apareceria: volta para os balões do
@@ -327,13 +321,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     private func requestSystemNotifications(explain: Bool) {
         Notifier.shared.requestPermission { granted in
             guard !granted else { return }
-            UserDefaults.standard.set(false, forKey: "systemNotifications")
+            Prefs.systemNotifications = false
             Log.write("notificações do sistema sem permissão: voltando para os balões do NeyZap")
             guard explain else { return }
-            let alert = NSAlert()
-            alert.messageText = "O macOS não deixou o NeyZap usar as notificações do sistema"
-            alert.informativeText = "As notificações continuam nos balões do próprio NeyZap. Para usar as do sistema, permita o NeyZap em Ajustes do Sistema → Notificações e ligue a opção de novo."
-            alert.runModal()
+            Dialogs.notice(
+                title: "O macOS não deixou o NeyZap usar as notificações do sistema",
+                message: "As notificações continuam nos balões do próprio NeyZap. Para usar as do sistema, permita o NeyZap em Ajustes do Sistema → Notificações e ligue a opção de novo."
+            )
         }
     }
 

@@ -14,8 +14,7 @@ enum UpdateChecker {
     private static var busy = false
     private static var installOnQuit: NSObjectProtocol?
 
-    private static let stagingDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("NeyZap/update", isDirectory: true)
+    private static let stagingDir = AppPaths.support.appendingPathComponent("update", isDirectory: true)
 
     /// `userInitiated`: mostra o resultado mesmo sem novidade (ou com erro).
     static func check(userInitiated: Bool) {
@@ -245,10 +244,7 @@ enum UpdateChecker {
     }
 
     private static func alert(_ title: String, _ text: String) {
-        let a = NSAlert()
-        a.messageText = title
-        a.informativeText = text
         NSApp.activate()
-        a.runModal()
+        Dialogs.notice(title: title, message: text)
     }
 }

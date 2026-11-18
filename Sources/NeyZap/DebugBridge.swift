@@ -24,7 +24,7 @@ final class DebugBridge {
     private static var commandURL: URL { AppPaths.debug.appendingPathComponent("command") }
 
     init?(windowController: MainWindowController) {
-        guard UserDefaults.standard.bool(forKey: "debugBridge") else {
+        guard Prefs.debugBridge else {
             Self.cleanUp()
             return nil
         }
@@ -83,7 +83,7 @@ final class DebugBridge {
                 session.webView.takeSnapshot(with: nil) { image, _ in
                     guard let image, let tiff = image.tiffRepresentation,
                           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return }
-                    self.write(png, to: "snap-\(AppPaths.safeName(session.name)).png")
+                    AppPaths.writePrivate(png, to: "snap-\(AppPaths.safeName(session.name)).png")
                 }
             }
         case "size":
@@ -175,11 +175,7 @@ final class DebugBridge {
     // MARK: - Arquivos
 
     private func write(_ text: String, to name: String) {
-        write(Data(text.utf8), to: name)
-    }
-
-    private func write(_ data: Data, to name: String) {
-        AppPaths.writePrivate(data, to: name)
+        AppPaths.writePrivate(Data(text.utf8), to: name)
     }
 
     /// Senha nova a cada abertura (a de antes deixa de valer).

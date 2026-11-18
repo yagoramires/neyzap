@@ -15,6 +15,7 @@ final class AccountSession: NSObject {
     }()
 
     let accountID: UUID
+    private var prefs: AccountPrefs { AccountPrefs(id: accountID) }
     var name: String
     let webView: WKWebView
     /// Guia do Instagram: o site puro, sem nada do inject.js/layout.css (que são do WhatsApp).
@@ -75,7 +76,7 @@ final class AccountSession: NSObject {
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = false
         webView.isInspectable = true
-        webView.pageZoom = CGFloat(UserDefaults.standard.object(forKey: "zoom") as? Double ?? 1)
+        webView.pageZoom = CGFloat(Prefs.zoom)
 
         if !isInstagram && !isDisabled {
             titleObservation = webView.observe(\.title, options: [.initial, .new]) { [weak self] webView, _ in
@@ -243,9 +244,8 @@ final class AccountSession: NSObject {
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
         if isInstagram { return }
-        // Depuração: abre o WhatsApp Web puro, sem nada injetado.
-        if UserDefaults.standard.bool(forKey: "debugNoInject") { return }
-        let bgSyncCheckedAt = Int((UserDefaults.standard.object(forKey: "bgSyncCheckedAt-\(accountID.uuidString)") as? Date)?.timeIntervalSince1970 ?? 0) * 1000
+        if Prefs.debugNoInject { return }
+        let bgSyncCheckedAt = Int(prefs.bgSyncCheckedAt?.timeIntervalSince1970 ?? 0) * 1000
         let config = "window.__neyzapConfig = { baseCSS: \(jsLiteral(Self.baseCSS)), userCSS: \(jsLiteral(userCSS)), compactWidth: 760, bgSyncCheckedAt: \(bgSyncCheckedAt) };"
         controller.addUserScript(WKUserScript(source: config, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         controller.addUserScript(WKUserScript(source: Self.injectJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -297,7 +297,7 @@ extension AccountSession: WKScriptMessageHandler {
             let title = body["title"] as? String ?? "WhatsApp"
             let text = body["body"] as? String ?? ""
             let account = AccountStore.shared.accounts.count > 1 ? name : nil
-            guard UserDefaults.standard.bool(forKey: "systemNotifications") else {
+            guard Prefs.systemNotifications else {
                 BannerCenter.shared.show(
                     BannerContent(accountID: accountID, jsID: jsID, key: tag.isEmpty ? identifier : "\(accountID.uuidString)|\(tag)",
                                   account: account, title: title, body: text),
@@ -317,7 +317,7 @@ extension AccountSession: WKScriptMessageHandler {
             )
         case "bgsync":
             // Tentativa registrada mesmo sem sucesso: a próxima só amanhã (sem loop).
-            UserDefaults.standard.set(Date(), forKey: "bgSyncCheckedAt-\(accountID.uuidString)")
+            prefs.bgSyncCheckedAt = Date()
             // A data entra no script das próximas cargas (⌘R, atualização do WhatsApp).
             installUserScripts(userCSS: UserStyle.shared.css)
             Log.write((body["ok"] as? Bool ?? false)
@@ -417,7 +417,7 @@ extension AccountSession: WKNavigationDelegate, WKDownloadDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loadedAt = Date()
         loadedFootprint = nil
-        Log.write("[\(name)] página carregada (processo \(webView.value(forKey: "_webProcessIdentifier") ?? "?"))")
+        Log.write("[\(name)] página carregada (processo \(webProcessID.map(String.init) ?? "?"))")
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -499,9 +499,7 @@ extension AccountSession: WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
-        let alert = NSAlert()
-        alert.messageText = message
-        alert.runModal()
+        Dialogs.notice(title: message, message: "")
         completionHandler()
     }
 

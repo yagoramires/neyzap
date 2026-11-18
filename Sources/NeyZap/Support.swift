@@ -11,7 +11,6 @@ enum BundledResource {
     }
 }
 
-/// Codifica uma string Swift como literal JavaScript.
 func jsLiteral(_ string: String) -> String {
     guard let data = try? JSONEncoder().encode(string), let literal = String(data: data, encoding: .utf8) else {
         return "\"\""
@@ -86,6 +85,13 @@ enum Dialogs {
         return value.isEmpty ? nil : value
     }
 
+    static func notice(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.runModal()
+    }
+
     static func confirm(title: String, message: String, confirm: String, destructive: Bool = false) -> Bool {
         let alert = NSAlert()
         alert.messageText = title
@@ -112,5 +118,25 @@ enum Grafite {
 
     private static func hex(_ v: Int) -> NSColor {
         NSColor(srgbRed: CGFloat(v >> 16 & 255) / 255, green: CGFloat(v >> 8 & 255) / 255, blue: CGFloat(v & 255) / 255, alpha: 1)
+    }
+}
+
+extension NSImage {
+    /// A mesma imagem (um símbolo, por exemplo) pintada de uma cor só.
+    func tinted(_ color: NSColor) -> NSImage {
+        NSImage(size: size, flipped: false) { rect in
+            self.draw(in: rect)
+            color.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+    }
+}
+
+extension NSView {
+    /// Chame em `updateTrackingAreas()`: refaz a área que avisa a entrada e a saída do mouse.
+    func resetHoverTracking() {
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
     }
 }

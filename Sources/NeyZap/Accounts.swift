@@ -63,6 +63,7 @@ final class AccountStore {
     func remove(_ id: UUID) {
         accounts.removeAll { $0.id == id }
         closed.insert(id)
+        AccountPrefs(id: id).clear()
         save()
     }
 
