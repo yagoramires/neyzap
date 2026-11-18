@@ -58,7 +58,7 @@ final class BannerCenter {
             existing.update(content, avatar: avatar)
             banners.removeAll { $0 === existing }
             banners.insert(existing, at: 0)
-            layout(animated: true)
+            layout()
             return
         }
 
@@ -71,7 +71,6 @@ final class BannerCenter {
         banner.onClose = { [weak self, weak banner] in
             if let banner { self?.dismiss(banner) }
         }
-        banner.onExpire = banner.onClose
 
         banners.insert(banner, at: 0)
         while banners.count > maxVisible, let oldest = banners.last { dismiss(oldest) }
@@ -80,7 +79,7 @@ final class BannerCenter {
         banner.setFrame(target.offsetBy(dx: 40, dy: 0), display: false)
         banner.alphaValue = 0
         banner.orderFrontRegardless()
-        layout(animated: true)
+        layout()
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.22
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -101,21 +100,17 @@ final class BannerCenter {
         }, completionHandler: {
             banner.orderOut(nil)
         })
-        layout(animated: true)
+        layout()
     }
 
-    private func layout(animated: Bool) {
+    private func layout() {
         for (i, banner) in banners.enumerated() {
             let target = frame(at: i)
             if banner.frame.origin.y == target.origin.y { continue }
-            if animated {
-                NSAnimationContext.runAnimationGroup({ context in
-                    context.duration = 0.2
-                    banner.animator().setFrame(target, display: true)
-                }, completionHandler: { banner.refreshHoverFromMouse() })
-            } else {
-                banner.setFrame(target, display: true)
-            }
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.2
+                banner.animator().setFrame(target, display: true)
+            }, completionHandler: { banner.refreshHoverFromMouse() })
         }
     }
 
@@ -159,7 +154,6 @@ final class BannerPanel: NSPanel {
     private(set) var content: BannerContent
     var onClick: (() -> Void)?
     var onClose: (() -> Void)?
-    var onExpire: (() -> Void)?
 
     /// Margem transparente em volta do balão, para o X poder ficar sobre a borda.
     static let margin: CGFloat = 8
@@ -211,7 +205,7 @@ final class BannerPanel: NSPanel {
     func startTimer() {
         timer?.invalidate()
         guard !hovering else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: Self.lifetime, repeats: false) { [weak self] _ in self?.onExpire?() }
+        timer = Timer.scheduledTimer(withTimeInterval: Self.lifetime, repeats: false) { [weak self] _ in self?.onClose?() }
     }
 
     func stopTimer() {
@@ -319,8 +313,7 @@ private final class BannerContainerView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        resetHoverTracking()
     }
 
     override func mouseEntered(with event: NSEvent) { onHover?(true) }
@@ -335,8 +328,7 @@ private final class CloseCircleView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        resetHoverTracking()
     }
 
     override func mouseEntered(with event: NSEvent) { hovering = true }
@@ -358,13 +350,7 @@ private final class CloseCircleView: NSView {
         circle.stroke()
         guard let glyph = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Fechar")?
             .withSymbolConfiguration(.init(pointSize: 8.5, weight: .bold)) else { return }
-        let tinted = NSImage(size: glyph.size, flipped: false) { rect in
-            glyph.draw(in: rect)
-            (self.hovering ? NSColor.labelColor : NSColor.secondaryLabelColor).set()
-            rect.fill(using: .sourceAtop)
-            return true
-        }
-        tinted.draw(in: NSRect(x: bounds.midX - glyph.size.width / 2, y: bounds.midY - glyph.size.height / 2,
+        glyph.tinted(hovering ? .labelColor : .secondaryLabelColor).draw(in: NSRect(x: bounds.midX - glyph.size.width / 2, y: bounds.midY - glyph.size.height / 2,
                                width: glyph.size.width, height: glyph.size.height))
     }
 }

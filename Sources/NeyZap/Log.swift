@@ -37,7 +37,6 @@ enum Log {
         }
     }
 
-    /// Abre o log no Console do macOS.
     static func reveal() {
         if !FileManager.default.fileExists(atPath: url.path) { write("log criado") }
         queue.sync {}

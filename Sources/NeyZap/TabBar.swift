@@ -25,7 +25,7 @@ final class TabBarView: NSView {
     private let stack = NSStackView()
     private let addButton = NSButton()
     private var items: [TabItemView] = []
-    private(set) var tabs: [Tab] = []
+    private var tabs: [Tab] = []
     private var selectedID: UUID?
 
     override init(frame frameRect: NSRect) {
@@ -158,7 +158,6 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         label.delegate = self
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         label.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
-        label.widthAnchor.constraint(greaterThanOrEqualToConstant: 0).isActive = true
 
         closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Fechar guia")
         closeButton.symbolConfiguration = .init(pointSize: 9, weight: .bold)
@@ -223,8 +222,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        resetHoverTracking()
     }
 
     override func mouseEntered(with event: NSEvent) { hovering = true }
@@ -270,8 +268,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         menu.addItem(withTitle: "Limpar sessão (novo QR code)…", action: #selector(resetFromMenu), keyEquivalent: "").target = self
         menu.addItem(withTitle: tab.disabled ? "Ativar guia" : "Desativar guia", action: #selector(toggleDisabledFromMenu), keyEquivalent: "")
         menu.addItem(.separator())
-        let close = menu.addItem(withTitle: "Fechar guia…", action: canClose ? #selector(closeTapped) : nil, keyEquivalent: "")
-        close.target = self
+        menu.addItem(withTitle: "Fechar guia…", action: canClose ? #selector(closeTapped) : nil, keyEquivalent: "")
         menu.items.forEach { $0.target = self }
         return menu
     }
@@ -385,13 +382,7 @@ private final class CountBadgeView: NSView {
         let textSize = text.size(withAttributes: attrs)
         var x = bounds.midX - (textSize.width + (icon.map { $0.size.width + 3 } ?? 0)) / 2
         if let icon {
-            let tinted = NSImage(size: icon.size, flipped: false) { r in
-                icon.draw(in: r)
-                self.textColor.set()
-                r.fill(using: .sourceAtop)
-                return true
-            }
-            tinted.draw(in: NSRect(x: x, y: bounds.midY - icon.size.height / 2, width: icon.size.width, height: icon.size.height))
+            icon.tinted(textColor).draw(in: NSRect(x: x, y: bounds.midY - icon.size.height / 2, width: icon.size.width, height: icon.size.height))
             x += icon.size.width + 3
         }
         text.draw(at: NSPoint(x: x, y: bounds.midY - textSize.height / 2), withAttributes: attrs)
