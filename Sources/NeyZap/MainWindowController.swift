@@ -1,6 +1,27 @@
 import AppKit
 import WebKit
 
+/// Duplo clique em área vazia da barra de cima faz o que a barra de título faria
+/// (Ajustes do Sistema › Mesa e Dock). Guias e botões ficam com os seus cliques.
+final class MainWindow: NSWindow {
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, event.clickCount == 2,
+           event.locationInWindow.y >= contentLayoutRect.maxY,
+           let hit = contentView?.superview?.hitTest(event.locationInWindow),
+           // Os botões do toolbar chegam como uma view interna, não NSControl: reconhecidos pela acessibilidade.
+           hit.mouseDownCanMoveWindow, !(hit is NSControl), hit.accessibilityRole() != .button {
+            // shortcut: "Fill" (macOS 15) cai no zoom; trocar quando houver API pública de preencher a tela.
+            switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+            case "Minimize": performMiniaturize(nil)
+            case "None": break
+            default: performZoom(nil)
+            }
+            return
+        }
+        super.sendEvent(event)
+    }
+}
+
 final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate {
     private(set) var sessions: [AccountSession] = []
     private(set) var selectedIndex = 0
@@ -36,7 +57,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSToolba
     }
 
     init() {
-        let window = NSWindow(
+        let window = MainWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
